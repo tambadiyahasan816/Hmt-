@@ -24,11 +24,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Business
-import com.example.data.model.BusinessCategory
+import com.example.data.model.BusinessCategories
 import com.example.data.model.Offer
 import com.example.ui.components.BusinessCard
 import com.example.ui.components.CategoryIcon
-import com.example.ui.components.OfferCard
 import com.example.ui.theme.*
 
 @Composable
@@ -39,20 +38,19 @@ fun HomeScreen(
     onFollowClick: (String) -> Unit,
     onSelectBusiness: (Business) -> Unit,
     onSelectOffer: (Offer) -> Unit,
-    onNavigateToOffersTab: () -> Unit,
     onNavigateToExplore: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var selectedCategoryFilter by remember { mutableStateOf<BusinessCategory?>(null) }
+    var selectedCategoryFilter by remember { mutableStateOf<String?>(null) }
 
     val filteredBusinesses = remember(searchQuery, selectedCategoryFilter, businesses) {
         businesses.filter { b ->
-            val matchesCategory = selectedCategoryFilter == null || b.category == selectedCategoryFilter
+            val matchesCategory = selectedCategoryFilter == null || b.category.equals(selectedCategoryFilter, ignoreCase = true)
             val matchesSearch = searchQuery.isBlank() ||
                     b.name.contains(searchQuery, ignoreCase = true) ||
                     b.area.contains(searchQuery, ignoreCase = true) ||
-                    b.category.displayName.contains(searchQuery, ignoreCase = true) ||
+                    b.category.contains(searchQuery, ignoreCase = true) ||
                     b.bio.contains(searchQuery, ignoreCase = true)
             matchesCategory && matchesSearch
         }
@@ -168,7 +166,7 @@ fun HomeScreen(
             }
         }
 
-        // Category Grid Section
+        // Category Grid Section (FIX 1: Expanded Categories)
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
                 Row(
@@ -195,8 +193,8 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(horizontal = 2.dp)
                 ) {
-                    items(BusinessCategory.values()) { category ->
-                        val isSelected = selectedCategoryFilter == category
+                    items(BusinessCategories.ALL.filter { it != "Other" }) { category ->
+                        val isSelected = selectedCategoryFilter.equals(category, ignoreCase = true)
                         val chipBg = if (isSelected) BrandPrimary else MaterialTheme.colorScheme.surface
                         val contentColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
 
@@ -221,7 +219,7 @@ fun HomeScreen(
                                     tint = if (isSelected) BrandSecondary else MaterialTheme.colorScheme.primary
                                 )
                                 Text(
-                                    text = category.displayName,
+                                    text = category,
                                     fontSize = 13.sp,
                                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                     color = contentColor
@@ -233,7 +231,7 @@ fun HomeScreen(
             }
         }
 
-        // Trending Deals Highlight Carousel
+        // Trending Deals Highlight Carousel (Relocated to Explore tab, but with preview here)
         item {
             Column(modifier = Modifier.padding(vertical = 8.dp)) {
                 Row(
@@ -258,7 +256,7 @@ fun HomeScreen(
                         )
                     }
 
-                    TextButton(onClick = onNavigateToOffersTab) {
+                    TextButton(onClick = onNavigateToExplore) {
                         Text("View all (${offers.size})", fontSize = 12.sp)
                     }
                 }
@@ -350,7 +348,7 @@ fun HomeScreen(
             }
         }
 
-        // Verified Businesses Feed Section
+        // Businesses Feed Section
         item {
             Row(
                 modifier = Modifier

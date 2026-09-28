@@ -33,6 +33,9 @@ class HimmatnagarRepository {
     private val _likedReelIds = MutableStateFlow<Set<String>>(emptySet())
     val likedReelIds: StateFlow<Set<String>> = _likedReelIds.asStateFlow()
 
+    private val _businessViews = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val businessViews: StateFlow<Map<String, Int>> = _businessViews.asStateFlow()
+
     init {
         seedInitialData()
     }
@@ -45,7 +48,7 @@ class HimmatnagarRepository {
                 id = "b1",
                 ownerId = "owner_1",
                 name = "Mahavir Mobile & Gadgets",
-                category = BusinessCategory.ELECTRONICS,
+                category = "Mobile & Gadgets",
                 phone = "+91 98250 11223",
                 whatsapp = "919825011223",
                 area = "Mahavirnagar",
@@ -61,7 +64,7 @@ class HimmatnagarRepository {
                 id = "b2",
                 ownerId = "owner_2",
                 name = "Shreeji Kathiyawadi & Punjabi Dhaba",
-                category = BusinessCategory.FOOD,
+                category = "Food & Dining",
                 phone = "+91 98981 44556",
                 whatsapp = "919898144556",
                 area = "Motipura",
@@ -77,7 +80,7 @@ class HimmatnagarRepository {
                 id = "b3",
                 ownerId = "owner_3",
                 name = "Royal Heritage Fashion & Kurtis",
-                category = BusinessCategory.FASHION,
+                category = "Fashion & Wear",
                 phone = "+91 94270 55667",
                 whatsapp = "919427055667",
                 area = "Station Road",
@@ -93,7 +96,7 @@ class HimmatnagarRepository {
                 id = "b4",
                 ownerId = "owner_4",
                 name = "Radhe Krishna Sweets & Farsan",
-                category = BusinessCategory.FOOD,
+                category = "Dairy & Sweets",
                 phone = "+91 98254 77889",
                 whatsapp = "919825477889",
                 area = "Tower Chowk",
@@ -109,7 +112,7 @@ class HimmatnagarRepository {
                 id = "b5",
                 ownerId = "owner_5",
                 name = "Apex 24/7 Pharmacy & Wellness",
-                category = BusinessCategory.MEDICAL,
+                category = "Medical & Pharma",
                 phone = "+91 97260 88990",
                 whatsapp = "919726088990",
                 area = "Tower Chowk",
@@ -125,7 +128,7 @@ class HimmatnagarRepository {
                 id = "b6",
                 ownerId = "owner_6",
                 name = "Polo Green Mart & Dry Fruits",
-                category = BusinessCategory.GROCERY,
+                category = "Grocery & Mart",
                 phone = "+91 94285 33221",
                 whatsapp = "919428533221",
                 area = "Polo Ground",
@@ -141,14 +144,14 @@ class HimmatnagarRepository {
                 id = "b7",
                 ownerId = "owner_7",
                 name = "Shree Ambica Jewellers",
-                category = BusinessCategory.JEWELRY,
+                category = "Jewelry & Gold",
                 phone = "+91 98242 66778",
                 whatsapp = "919824266778",
                 area = "Station Road",
                 address = "Sona Bazaar, Station Road, Himmatnagar",
                 lat = 23.5955,
                 lng = 72.9618,
-                bio = "100% BIS Hallmarked 916 Gold jewellery, certified Solitaire rings, bridal necklace sets & custom craftsmanship.",
+                bio = "916 Hallmark Gold jewellery, certified Diamond solitaires, silver gift items & bridal collections since 1978.",
                 followerCount = 2890,
                 rating = 4.9f,
                 reviewCount = 188
@@ -156,285 +159,260 @@ class HimmatnagarRepository {
             Business(
                 id = "b8",
                 ownerId = "owner_8",
-                name = "Krishna Auto Spa & Car Care",
-                category = BusinessCategory.AUTO,
-                phone = "+91 99099 22334",
-                whatsapp = "919909922334",
-                area = "Bypass Road",
-                address = "Bypass Ring Road, Near HP Petrol Pump, Himmatnagar",
-                lat = 23.5910,
+                name = "Himmat Auto Care & Garage",
+                category = "Auto & Vehicles",
+                phone = "+91 99790 12345",
+                whatsapp = "919979012345",
+                area = "GIDC Area",
+                address = "Near GIDC Entrance, Idar Road, Himmatnagar",
+                lat = 23.6050,
                 lng = 72.9750,
-                bio = "High-pressure snow foam wash, interior dry cleaning, 9H ceramic coating & wheel alignment.",
-                followerCount = 1120,
+                bio = "Multi-brand car computerized service, wheel alignment, ceramic coating, cashless insurance accidental repairs & AC gas filling.",
+                followerCount = 760,
                 rating = 4.7f,
-                reviewCount = 92
+                reviewCount = 42
             )
         )
         _businesses.value = sampleBusinesses
 
+        // Seed views
+        _businessViews.value = mapOf(
+            "b1" to 1420,
+            "b2" to 3100,
+            "b3" to 890,
+            "b4" to 2200,
+            "b5" to 430,
+            "b6" to 670,
+            "b7" to 1540,
+            "b8" to 390
+        )
+
         val sampleOffers = listOf(
             Offer(
-                id = "o1",
+                id = "off1",
                 businessId = "b1",
                 businessName = "Mahavir Mobile & Gadgets",
                 area = "Mahavirnagar",
-                productName = "iPhone 18 Pro (256GB)",
-                category = BusinessCategory.ELECTRONICS,
-                originalPrice = 134900.0,
-                discountedPrice = 119900.0,
+                productName = "Apple iPhone 16 / 15 Pro 128GB",
+                category = "Mobile & Gadgets",
+                originalPrice = 79900.0,
+                discountedPrice = 69999.0,
                 discountPercent = 12,
                 couponCode = "HIMMATIPHONE",
-                validUntil = "Oct 15, 2026"
+                validUntil = "30 Oct 2026"
             ),
             Offer(
-                id = "o2",
+                id = "off2",
                 businessId = "b2",
                 businessName = "Shreeji Kathiyawadi & Punjabi Dhaba",
                 area = "Motipura",
-                productName = "Unlimited Gujarati Kathiyawadi Thali",
-                category = BusinessCategory.FOOD,
-                originalPrice = 350.0,
+                productName = "Special Unlimited Kathiyawadi Thali with Sweet",
+                category = "Food & Dining",
+                originalPrice = 280.0,
                 discountedPrice = 199.0,
-                discountPercent = 43,
-                couponCode = "DESITHALI",
-                validUntil = "Oct 10, 2026"
+                discountPercent = 28,
+                couponCode = "SHREEJI28",
+                validUntil = "15 Nov 2026"
             ),
             Offer(
-                id = "o3",
+                id = "off3",
                 businessId = "b3",
                 businessName = "Royal Heritage Fashion & Kurtis",
                 area = "Station Road",
-                productName = "Festive Cotton Embroidered Kurti Set",
-                category = BusinessCategory.FASHION,
-                originalPrice = 1499.0,
-                discountedPrice = 699.0,
-                discountPercent = 53,
-                couponCode = "FESTIVE50",
-                validUntil = "Oct 20, 2026"
+                productName = "Festive Pure Cotton & Rayon Designer Kurti Combo (Set of 2)",
+                category = "Fashion & Wear",
+                originalPrice = 2200.0,
+                discountedPrice = 1299.0,
+                discountPercent = 40,
+                couponCode = "FESTIVE40",
+                validUntil = "25 Oct 2026"
             ),
             Offer(
-                id = "o4",
+                id = "off4",
                 businessId = "b6",
                 businessName = "Polo Green Mart & Dry Fruits",
                 area = "Polo Ground",
-                productName = "Premium California Almonds + Walnuts Combo (1kg)",
-                category = BusinessCategory.GROCERY,
-                originalPrice = 1500.0,
-                discountedPrice = 950.0,
-                discountPercent = 37,
-                couponCode = "POLONUTS",
-                validUntil = "Oct 12, 2026"
-            ),
-            Offer(
-                id = "o5",
-                businessId = "b1",
-                businessName = "Mahavir Mobile & Gadgets",
-                area = "Mahavirnagar",
-                productName = "Smart Fitness Band Watch 9 AMOLED",
-                category = BusinessCategory.ELECTRONICS,
-                originalPrice = 3999.0,
-                discountedPrice = 1499.0,
-                discountPercent = 62,
-                couponCode = "SMART62",
-                validUntil = "Oct 08, 2026"
-            ),
-            Offer(
-                id = "o6",
-                businessId = "b5",
-                businessName = "Apex 24/7 Pharmacy & Wellness",
-                area = "Tower Chowk",
-                productName = "Full Body Comprehensive Health Test Package",
-                category = BusinessCategory.MEDICAL,
-                originalPrice = 1999.0,
+                productName = "Premium Jumbo California Almonds (1kg Vacuum Pack)",
+                category = "Grocery & Mart",
+                originalPrice = 1100.0,
                 discountedPrice = 799.0,
-                discountPercent = 60,
-                couponCode = "CARE60",
-                validUntil = "Oct 30, 2026"
+                discountPercent = 27,
+                couponCode = "ALMOND27",
+                validUntil = "10 Nov 2026"
             ),
             Offer(
-                id = "o7",
+                id = "off5",
+                businessId = "b8",
+                businessName = "Himmat Auto Care & Garage",
+                area = "GIDC Area",
+                productName = "Complete Car Deep Foam Wash & Interior Dry Cleaning",
+                category = "Auto & Vehicles",
+                originalPrice = 1500.0,
+                discountedPrice = 899.0,
+                discountPercent = 40,
+                couponCode = "AUTOSPA",
+                validUntil = "31 Oct 2026"
+            ),
+            Offer(
+                id = "off6",
                 businessId = "b4",
                 businessName = "Radhe Krishna Sweets & Farsan",
                 area = "Tower Chowk",
-                productName = "Pure Desi Ghee Kaju Katli (500g Gift Box)",
-                category = BusinessCategory.FOOD,
-                originalPrice = 550.0,
-                discountedPrice = 380.0,
-                discountPercent = 31,
-                couponCode = "SWEET30",
-                validUntil = "Oct 05, 2026"
-            ),
-            Offer(
-                id = "o8",
-                businessId = "b8",
-                businessName = "Krishna Auto Spa & Car Care",
-                area = "Bypass Road",
-                productName = "Complete Exterior Ceramic Foam Detailing",
-                category = BusinessCategory.AUTO,
-                originalPrice = 9000.0,
-                discountedPrice = 4999.0,
-                discountPercent = 44,
-                couponCode = "AUTOSPA",
-                validUntil = "Oct 18, 2026"
+                productName = "Pure Desi Ghee Kaju Katli (1 Kg Pack)",
+                category = "Dairy & Sweets",
+                originalPrice = 1000.0,
+                discountedPrice = 799.0,
+                discountPercent = 20,
+                couponCode = "SWEET20",
+                validUntil = "05 Nov 2026"
             )
         )
         _offers.value = sampleOffers
 
+        // Seed 10-day expiring reels with visible countdown badge
         val sampleReels = listOf(
             Reel(
-                id = "r1",
+                id = "reel1",
                 businessId = "b1",
                 businessName = "Mahavir Mobile & Gadgets",
                 businessCategory = "Mobile & Gadgets",
                 businessPhone = "+91 98250 11223",
                 businessWhatsapp = "919825011223",
-                title = "New iPhone 18 Pro Unboxing & Festive Launch Event!",
-                caption = "Now in stock at Mahavir Mobile Himmatnagar! Get flat ₹15,000 exchange bonus & free wireless adapter on every purchase today. Call us now!",
-                likes = 340,
-                views = 1840,
-                createdAt = now - TimeUnit.DAYS.toMillis(1),
-                expiresAt = (now - TimeUnit.DAYS.toMillis(1)) + TimeUnit.DAYS.toMillis(10),
+                title = "New Arrival: iPhone 16 Pro Deep Purple in Himmatnagar!",
+                caption = "Unboxing first batch of festival stock! Special exchange bonus up to ₹8,000 for Himmatnagar residents. Visit Mahavirnagar today.",
+                likes = 342,
+                views = 2800,
+                createdAt = now - TimeUnit.DAYS.toMillis(2),
+                expiresAt = (now - TimeUnit.DAYS.toMillis(2)) + TimeUnit.DAYS.toMillis(10), // 8 days remaining
                 gradientColorIndex = 0
             ),
             Reel(
-                id = "r2",
+                id = "reel2",
                 businessId = "b2",
                 businessName = "Shreeji Kathiyawadi & Punjabi Dhaba",
                 businessCategory = "Food & Dining",
                 businessPhone = "+91 98981 44556",
                 businessWhatsapp = "919898144556",
-                title = "Fresh Ringna No Olo & Hot Bajra Rotla Live Preparation",
-                caption = "Experience the real smoke flavour of charcoal-roasted ringna no olo with organic white butter! Unlimited Thali ₹199 only this weekend.",
-                likes = 890,
-                views = 4320,
-                createdAt = now - TimeUnit.DAYS.toMillis(3),
-                expiresAt = (now - TimeUnit.DAYS.toMillis(3)) + TimeUnit.DAYS.toMillis(10),
+                title = "Live Sizzling Paneer Angara & Clay Pot Bajra Roti",
+                caption = "Fresh evening cooking in clay tandoor! Served hot with desi white makhan and pure garlic chutney. Family AC hall ready.",
+                likes = 612,
+                views = 5400,
+                createdAt = now - TimeUnit.DAYS.toMillis(4),
+                expiresAt = (now - TimeUnit.DAYS.toMillis(4)) + TimeUnit.DAYS.toMillis(10), // 6 days remaining
                 gradientColorIndex = 1
             ),
             Reel(
-                id = "r3",
+                id = "reel3",
                 businessId = "b3",
                 businessName = "Royal Heritage Fashion & Kurtis",
                 businessCategory = "Fashion & Wear",
                 businessPhone = "+91 94270 55667",
                 businessWhatsapp = "919427055667",
-                title = "Bridal Chaniya Choli & Navratri Designer Collection",
-                caption = "Handcrafted mirror work, pure silk and vibrant heritage colours straight from our workshop! Visit our Station Road showroom.",
-                likes = 620,
-                views = 2950,
-                createdAt = now - TimeUnit.DAYS.toMillis(2),
-                expiresAt = (now - TimeUnit.DAYS.toMillis(2)) + TimeUnit.DAYS.toMillis(10),
+                title = "Handcrafted Kutchi Embroidery & Mirror Work Chaniya Cholis",
+                caption = "Festive collection preview! Sizes XS to 3XL available. Pure cotton ghagra with heavy flared dupatta. Order via WhatsApp.",
+                likes = 890,
+                views = 7200,
+                createdAt = now - TimeUnit.DAYS.toMillis(1),
+                expiresAt = (now - TimeUnit.DAYS.toMillis(1)) + TimeUnit.DAYS.toMillis(10), // 9 days remaining
                 gradientColorIndex = 2
             ),
             Reel(
-                id = "r4",
+                id = "reel4",
                 businessId = "b4",
                 businessName = "Radhe Krishna Sweets & Farsan",
-                businessCategory = "Food & Dining",
+                businessCategory = "Dairy & Sweets",
                 businessPhone = "+91 98254 77889",
                 businessWhatsapp = "919825477889",
-                title = "Morning Hot Fafda Jalebi & Kadhi Making at Tower Chowk",
-                caption = "Crispy fafda, piping hot saffron jalebi with spicy papaya sambharo. Himmatnagar's favourite breakfast since 1984!",
-                likes = 1250,
-                views = 6100,
-                createdAt = now - TimeUnit.DAYS.toMillis(4),
-                expiresAt = (now - TimeUnit.DAYS.toMillis(4)) + TimeUnit.DAYS.toMillis(10),
+                title = "Crispy Golden Jalebi in Pure Amul Desi Ghee",
+                caption = "Every morning 7 AM sharp! Authentic Himmatnagar taste with raw papaya sambharo and spicy fried green chillies.",
+                likes = 450,
+                views = 3100,
+                createdAt = now - TimeUnit.DAYS.toMillis(7),
+                expiresAt = (now - TimeUnit.DAYS.toMillis(7)) + TimeUnit.DAYS.toMillis(10), // 3 days remaining
                 gradientColorIndex = 3
-            ),
-            Reel(
-                id = "r5",
-                businessId = "b8",
-                businessName = "Krishna Auto Spa & Car Care",
-                businessCategory = "Auto & Vehicles",
-                businessPhone = "+91 99099 22334",
-                businessWhatsapp = "9909922334",
-                title = "Extreme Snow Foam Wash & 9H Ceramic Gloss Demonstration",
-                caption = "Watch the mirror finish shine! Protection against highway dust, UV fading and swirl marks. Book your slot via WhatsApp.",
-                likes = 410,
-                views = 1680,
-                createdAt = now - TimeUnit.DAYS.toMillis(2),
-                expiresAt = (now - TimeUnit.DAYS.toMillis(2)) + TimeUnit.DAYS.toMillis(10),
-                gradientColorIndex = 4
             )
         )
         _reels.value = sampleReels
 
+        // Workers Directory
         val sampleWorkers = listOf(
             Worker(
                 id = "w1",
+                profileId = "profile_w1",
                 name = "Ramesh Solanki",
                 serviceType = "Plumber",
-                phone = "+91 98251 90812",
+                phone = "+91 98791 22334",
+                whatsapp = "919879122334",
                 area = "Motipura",
-                experience = "12 Years Exp",
-                rating = 4.9f
+                experienceYears = "8 Years Exp",
+                rating = 4.8f,
+                createdBy = "Registered Worker"
             ),
             Worker(
                 id = "w2",
-                name = "Jignesh Panchal",
+                profileId = "profile_w2",
+                name = "Kanti Panchal",
                 serviceType = "Electrician",
-                phone = "+91 97230 41526",
+                phone = "+91 97250 88441",
+                whatsapp = "919725088441",
                 area = "Mahavirnagar",
-                experience = "8 Years Exp",
-                rating = 4.8f
+                experienceYears = "12 Years Exp",
+                rating = 4.9f,
+                createdBy = "Registered Worker"
             ),
             Worker(
                 id = "w3",
+                profileId = "profile_w3",
                 name = "Bharat Prajapati",
-                serviceType = "AC Repair & Technician",
+                serviceType = "AC/TV/Fridge Repair",
                 phone = "+91 99042 11984",
+                whatsapp = "919904211984",
                 area = "Station Road",
-                experience = "6 Years Exp",
-                rating = 4.7f
+                experienceYears = "6 Years Exp",
+                rating = 4.7f,
+                createdBy = "Registered Worker"
             ),
             Worker(
                 id = "w4",
+                profileId = "profile_w4",
                 name = "Sunita Patel",
-                serviceType = "Mathematics & Science Tutor",
+                serviceType = "Tutor",
                 phone = "+91 94268 77213",
+                whatsapp = "919426877213",
                 area = "Polo Ground",
-                experience = "7 Years Exp",
-                rating = 4.9f
+                experienceYears = "7 Years Exp",
+                rating = 4.9f,
+                createdBy = "Registered Worker"
             ),
             Worker(
                 id = "w5",
+                profileId = "profile_w5",
                 name = "Dinesh Mistri",
-                serviceType = "Carpenter & Wood Interior",
+                serviceType = "Carpenter",
                 phone = "+91 98980 33412",
+                whatsapp = "919898033412",
                 area = "Tower Chowk",
-                experience = "15 Years Exp",
-                rating = 4.8f
+                experienceYears = "15 Years Exp",
+                rating = 4.8f,
+                createdBy = "Registered Worker"
             ),
             Worker(
                 id = "w6",
+                profileId = "profile_w6",
                 name = "Mahesh Vankar",
-                serviceType = "House Painter & Wall Polish",
+                serviceType = "Painter",
                 phone = "+91 98244 55112",
-                area = "Bypass Road",
-                experience = "10 Years Exp",
-                rating = 4.6f
+                whatsapp = "919824455112",
+                area = "GIDC Area",
+                experienceYears = "10 Years Exp",
+                rating = 4.6f,
+                createdBy = "Registered Worker"
             )
         )
         _workers.value = sampleWorkers
-
-        // Initial welcome chat message
-        _chatMessages.value = listOf(
-            ChatMessage(
-                id = "m1",
-                chatId = "chat_b1",
-                businessId = "b1",
-                businessName = "Mahavir Mobile & Gadgets",
-                senderId = "b1",
-                senderName = "Mahavir Mobile",
-                text = "Welcome to Mahavir Mobile Himmatnagar! How can we assist you with smartphones or offers today?",
-                timestamp = now - 3600000,
-                isFromOwner = true
-            )
-        )
     }
 
-    // Auto-Delete Feature Implementation
-    // Check and remove reels where expires_at < now()
+    // Auto-Delete Feature Implementation: purge expired reels where expires_at < now()
     fun purgeExpiredReels() {
         val now = System.currentTimeMillis()
         _reels.value = _reels.value.filter { !it.isExpired(now) }
@@ -459,7 +437,7 @@ class HimmatnagarRepository {
         shopName: String,
         ownerName: String,
         phone: String,
-        category: BusinessCategory,
+        category: String,
         area: String,
         address: String,
         whatsapp: String
@@ -485,10 +463,48 @@ class HimmatnagarRepository {
             lat = HimmatnagarLocations.CENTER_LAT + (Math.random() - 0.5) * 0.01,
             lng = HimmatnagarLocations.CENTER_LNG + (Math.random() - 0.5) * 0.01,
             bio = "Official store in $area, Himmatnagar. Welcome customers for best deals and authentic products.",
-            isApproved = true // Automatically marked ready or pending review
+            isApproved = true,
+            followerCount = 0,
+            rating = 0f,
+            reviewCount = 0
         )
         _businesses.value = listOf(newBusiness) + _businesses.value
+        _businessViews.value = _businessViews.value + (newBusiness.id to 0)
         return newBusiness
+    }
+
+    fun loginOrRegisterWorker(
+        name: String,
+        phone: String,
+        serviceType: String,
+        area: String,
+        exp: String,
+        photoUrl: String = ""
+    ): Worker {
+        val workerId = "worker_${UUID.randomUUID().toString().take(8)}"
+        val user = UserProfile(
+            id = workerId,
+            phone = phone,
+            role = UserRole.WORKER,
+            name = name
+        )
+        _currentUser.value = user
+
+        val newWorker = Worker(
+            id = workerId,
+            profileId = workerId,
+            name = name,
+            serviceType = serviceType,
+            phone = phone,
+            whatsapp = phone,
+            area = area,
+            experienceYears = if (exp.isNotBlank()) exp else "Experienced",
+            photoUrl = photoUrl,
+            rating = 0f,
+            createdBy = "Registered Worker"
+        )
+        _workers.value = listOf(newWorker) + _workers.value
+        return newWorker
     }
 
     fun switchRoleForTesting(newRole: UserRole) {
@@ -501,6 +517,7 @@ class HimmatnagarRepository {
                 name = when (newRole) {
                     UserRole.CUSTOMER -> "Aarav Shah (Customer)"
                     UserRole.OWNER -> "Rajesh Patel (Owner)"
+                    UserRole.WORKER -> "Ramesh Solanki (Worker)"
                     UserRole.ADMIN -> "Admin Himmatnagar"
                 }
             )
@@ -525,6 +542,7 @@ class HimmatnagarRepository {
         }
     }
 
+    // Like Reel
     fun toggleLikeReel(reelId: String) {
         val current = _likedReelIds.value
         if (current.contains(reelId)) {
@@ -540,30 +558,24 @@ class HimmatnagarRepository {
         }
     }
 
-    // Business Owner Actions (Protected)
-    fun addReel(
-        businessId: String,
-        title: String,
-        caption: String,
-        videoUrl: String = ""
-    ) {
-        val business = _businesses.value.find { it.id == businessId } ?: _businesses.value.first()
+    // Business Owner Actions
+    fun addReel(businessId: String, title: String, caption: String) {
+        val business = _businesses.value.find { it.id == businessId } ?: return
         val now = System.currentTimeMillis()
         val newReel = Reel(
-            id = "r_${UUID.randomUUID().toString().take(8)}",
+            id = "reel_${UUID.randomUUID().toString().take(8)}",
             businessId = business.id,
             businessName = business.name,
-            businessCategory = business.category.displayName,
+            businessCategory = business.category,
             businessPhone = business.phone,
             businessWhatsapp = business.whatsapp,
-            videoUrl = videoUrl,
             title = title,
             caption = caption,
-            likes = 1,
-            views = 10,
+            likes = 0,
+            views = 0,
             createdAt = now,
-            expiresAt = now + TimeUnit.DAYS.toMillis(10), // strictly 10 days
-            gradientColorIndex = (_reels.value.size % 5)
+            expiresAt = now + TimeUnit.DAYS.toMillis(10), // Strictly 10 days
+            gradientColorIndex = (0..3).random()
         )
         _reels.value = listOf(newReel) + _reels.value
     }
@@ -575,19 +587,19 @@ class HimmatnagarRepository {
     fun addOffer(
         businessId: String,
         productName: String,
-        category: BusinessCategory,
+        category: String,
         originalPrice: Double,
         discountedPrice: Double,
         couponCode: String,
         validUntil: String
     ) {
-        val business = _businesses.value.find { it.id == businessId } ?: _businesses.value.first()
+        val business = _businesses.value.find { it.id == businessId } ?: return
         val discountPercent = if (originalPrice > 0) {
             (((originalPrice - discountedPrice) / originalPrice) * 100).toInt().coerceIn(1, 99)
         } else 10
 
         val newOffer = Offer(
-            id = "o_${UUID.randomUUID().toString().take(8)}",
+            id = "off_${UUID.randomUUID().toString().take(8)}",
             businessId = business.id,
             businessName = business.name,
             area = business.area,
@@ -614,8 +626,37 @@ class HimmatnagarRepository {
         address: String
     ) {
         _businesses.value = _businesses.value.map {
-            if (it.id == businessId) it.copy(bio = bio, phone = phone, whatsapp = whatsapp, address = address) else it
+            if (it.id == businessId) {
+                it.copy(
+                    bio = bio,
+                    phone = phone,
+                    whatsapp = whatsapp,
+                    address = address
+                )
+            } else it
         }
+    }
+
+    fun updateWorkerProfile(
+        workerId: String,
+        name: String,
+        serviceType: String,
+        phone: String,
+        area: String,
+        experienceYears: String
+    ) {
+        _workers.value = _workers.value.map {
+            if (it.id == workerId || it.profileId == workerId) {
+                it.copy(
+                    name = name,
+                    serviceType = serviceType,
+                    phone = phone,
+                    area = area,
+                    experienceYears = experienceYears
+                )
+            } else it
+        }
+        _currentUser.value = _currentUser.value?.copy(name = name, phone = phone)
     }
 
     // Worker Directory Actions
@@ -624,35 +665,36 @@ class HimmatnagarRepository {
         serviceType: String,
         phone: String,
         area: String,
-        experience: String
+        exp: String
     ) {
         val newWorker = Worker(
             id = "w_${UUID.randomUUID().toString().take(8)}",
+            profileId = "",
             name = name,
             serviceType = serviceType,
             phone = phone,
+            whatsapp = phone,
             area = area,
-            experience = experience,
-            createdBy = _currentUser.value?.name ?: "Community Member"
+            experienceYears = exp,
+            rating = 0f,
+            createdBy = "Community"
         )
         _workers.value = listOf(newWorker) + _workers.value
     }
 
     // Chat Actions
-    fun sendChatMessage(
-        businessId: String,
-        businessName: String,
-        text: String,
-        isFromOwner: Boolean
-    ) {
+    fun sendChatMessage(businessId: String, businessName: String, text: String, isFromOwner: Boolean) {
         val user = _currentUser.value
+        val senderId = user?.id ?: "guest"
+        val senderName = user?.name ?: if (isFromOwner) businessName else "Customer"
+
         val newMsg = ChatMessage(
-            id = "m_${UUID.randomUUID().toString().take(8)}",
+            id = "msg_${UUID.randomUUID().toString().take(8)}",
             chatId = "chat_$businessId",
             businessId = businessId,
             businessName = businessName,
-            senderId = user?.id ?: "guest",
-            senderName = user?.name ?: if (isFromOwner) businessName else "Customer",
+            senderId = senderId,
+            senderName = senderName,
             text = text,
             timestamp = System.currentTimeMillis(),
             isFromOwner = isFromOwner
@@ -661,9 +703,9 @@ class HimmatnagarRepository {
     }
 
     // Admin Actions
-    fun approveBusiness(businessId: String, approve: Boolean) {
+    fun approveBusiness(businessId: String, isApproved: Boolean) {
         _businesses.value = _businesses.value.map {
-            if (it.id == businessId) it.copy(isApproved = approve) else it
+            if (it.id == businessId) it.copy(isApproved = isApproved) else it
         }
     }
 

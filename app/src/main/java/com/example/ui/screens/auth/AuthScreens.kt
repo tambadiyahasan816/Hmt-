@@ -28,14 +28,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.data.model.BusinessCategory
+import com.example.data.model.BusinessCategories
 import com.example.data.model.HimmatnagarLocations
+import com.example.data.model.WorkerServiceTypes
 import com.example.ui.theme.*
 
+// FIX 2: Role selection screen with 3 options: Business Owner, Worker, Customer
 @Composable
 fun RoleSelectionScreen(
     onSelectCustomer: () -> Unit,
     onSelectOwner: () -> Unit,
+    onSelectWorker: () -> Unit,
     onContinueAsGuest: () -> Unit
 ) {
     Box(
@@ -50,7 +53,7 @@ fun RoleSelectionScreen(
                     )
                 )
             )
-            .padding(24.dp)
+            .padding(20.dp)
     ) {
         Column(
             modifier = Modifier
@@ -59,59 +62,59 @@ fun RoleSelectionScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // App Brand Header
             Box(
                 modifier = Modifier
-                    .size(80.dp)
-                    .clip(RoundedCornerShape(24.dp))
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(22.dp))
                     .background(Color.White.copy(alpha = 0.12f))
-                    .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(24.dp)),
+                    .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(22.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Storefront,
                     contentDescription = null,
                     tint = BrandSecondary,
-                    modifier = Modifier.size(44.dp)
+                    modifier = Modifier.size(40.dp)
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Text(
                 text = "Sheher Himmatnagar",
-                fontSize = 28.sp,
+                fontSize = 26.sp,
                 fontWeight = FontWeight.ExtraBold,
                 color = Color.White,
                 textAlign = TextAlign.Center
             )
 
             Text(
-                text = "Explore Local Shops, Deals & Services",
-                fontSize = 14.sp,
-                color = Color.White.copy(alpha = 0.8f),
+                text = "Local Shops, Deals, Workers & Services",
+                fontSize = 13.sp,
+                color = Color.White.copy(alpha = 0.85f),
                 textAlign = TextAlign.Center
             )
 
-            Spacer(modifier = Modifier.height(36.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
             Text(
-                text = "Choose how you want to continue:",
-                fontSize = 15.sp,
+                text = "Choose your role to get started:",
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = Color.White.copy(alpha = 0.9f)
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // Large Button 1: Business Owner
+            // Option 1: Business Owner
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onSelectOwner() },
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = Color.White.copy(alpha = 0.15f)
                 ),
@@ -125,12 +128,12 @@ fun RoleSelectionScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp),
+                        .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(54.dp)
+                            .size(50.dp)
                             .clip(CircleShape)
                             .background(BrandSecondary),
                         contentAlignment = Alignment.Center
@@ -139,25 +142,25 @@ fun RoleSelectionScreen(
                             imageVector = Icons.Default.Store,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(30.dp)
+                            modifier = Modifier.size(28.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "I'm a Business Owner",
-                            fontSize = 18.sp,
+                            fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "List shop, post 10-day reels, publish discount offers & get local orders",
-                            fontSize = 12.sp,
+                            text = "Have a shop? Post reels, publish offers, manage dashboard & connect with customers",
+                            fontSize = 11.sp,
                             color = Color.White.copy(alpha = 0.8f),
-                            lineHeight = 16.sp
+                            lineHeight = 15.sp
                         )
                     }
 
@@ -165,19 +168,85 @@ fun RoleSelectionScreen(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = null,
                         tint = BrandSecondary,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
-            // Large Button 2: Customer
+            // Option 2: Worker (FIX 2)
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onSelectWorker() },
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = Color.White.copy(alpha = 0.15f)
+                ),
+                border = CardDefaults.outlinedCardBorder().copy(
+                    brush = Brush.linearGradient(
+                        listOf(Color(0xFFF97316), Color(0xFFEA580C))
+                    ),
+                    width = 1.5.dp
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFF97316)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Build,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "I'm a Worker",
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "No shop? Plumbers, electricians, painters, mechanics, tutors get direct customer calls",
+                            fontSize = 11.sp,
+                            color = Color.White.copy(alpha = 0.8f),
+                            lineHeight = 15.sp
+                        )
+                    }
+
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                        contentDescription = null,
+                        tint = Color(0xFFF97316),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Option 3: Customer
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onSelectCustomer() },
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(
                     containerColor = Color.White.copy(alpha = 0.12f)
                 ),
@@ -191,12 +260,12 @@ fun RoleSelectionScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp),
+                        .padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(54.dp)
+                            .size(50.dp)
                             .clip(CircleShape)
                             .background(BrandPrimaryLight),
                         contentAlignment = Alignment.Center
@@ -205,25 +274,25 @@ fun RoleSelectionScreen(
                             imageVector = Icons.Default.Person,
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(30.dp)
+                            modifier = Modifier.size(28.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(16.dp))
+                    Spacer(modifier = Modifier.width(14.dp))
 
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = "I'm a Customer",
-                            fontSize = 18.sp,
+                            fontSize = 17.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
-                        Spacer(modifier = Modifier.height(4.dp))
+                        Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Discover Himmatnagar shops, find highest discounts, watch reels & call",
-                            fontSize = 12.sp,
+                            text = "Discover Himmatnagar shops, highest discounts, watch reels & find local workers",
+                            fontSize = 11.sp,
                             color = Color.White.copy(alpha = 0.8f),
-                            lineHeight = 16.sp
+                            lineHeight = 15.sp
                         )
                     }
 
@@ -231,12 +300,12 @@ fun RoleSelectionScreen(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = null,
                         tint = BrandPrimaryLight,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(24.dp))
 
             TextButton(
                 onClick = onContinueAsGuest,
@@ -262,10 +331,10 @@ fun CustomerAuthScreen(
     onSuccess: (name: String, phone: String) -> Unit
 ) {
     val context = LocalContext.current
-    var name by remember { mutableStateOf("") }
-    var phone by remember { mutableStateOf("") }
-    var otpCode by remember { mutableStateOf("") }
+    var fullName by remember { mutableStateOf("") }
+    var phoneNumber by remember { mutableStateOf("") }
     var isOtpSent by remember { mutableStateOf(false) }
+    var otpInput by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
@@ -287,58 +356,55 @@ fun CustomerAuthScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-            horizontalAlignment = Alignment.Start
+                .padding(24.dp)
         ) {
             Text(
-                text = "Welcome, Citizen of Himmatnagar!",
+                text = "Welcome to Himmatnagar!",
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )
             Spacer(modifier = Modifier.height(4.dp))
             Text(
-                text = "Sign in with your mobile number to follow shops, save discounts and chat.",
+                text = "Sign in to save favorite shops, claim coupon codes, chat with local owners and discover best deals.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.outline
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(28.dp))
 
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Your Full Name") },
-                leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isOtpSent
-            )
+            if (!isOtpSent) {
+                OutlinedTextField(
+                    value = fullName,
+                    onValueChange = { fullName = it },
+                    label = { Text("Full Name") },
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-            Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-            OutlinedTextField(
-                value = phone,
-                onValueChange = { if (it.length <= 10) phone = it },
-                label = { Text("Mobile Number") },
-                prefix = { Text("+91 ") },
-                leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !isOtpSent
-            )
+                OutlinedTextField(
+                    value = phoneNumber,
+                    onValueChange = { if (it.length <= 10) phoneNumber = it },
+                    label = { Text("Mobile Phone Number") },
+                    prefix = { Text("+91 ") },
+                    leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-            Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
-            AnimatedVisibility(visible = !isOtpSent) {
                 Button(
                     onClick = {
-                        if (name.isBlank() || phone.length < 10) {
-                            Toast.makeText(context, "Please enter your name and 10-digit phone number", Toast.LENGTH_SHORT).show()
+                        if (fullName.isBlank() || phoneNumber.length < 10) {
+                            Toast.makeText(context, "Please enter your name and 10-digit mobile number", Toast.LENGTH_SHORT).show()
                         } else {
                             isOtpSent = true
-                            otpCode = "458921" // Demo prefill for convenience
-                            Toast.makeText(context, "OTP sent via Supabase Auth (Demo code: 458921)", Toast.LENGTH_LONG).show()
+                            otpInput = "482910"
+                            Toast.makeText(context, "OTP sent to +91 $phoneNumber (Demo code: 482910)", Toast.LENGTH_LONG).show()
                         }
                     },
                     modifier = Modifier
@@ -346,82 +412,374 @@ fun CustomerAuthScreen(
                         .height(50.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Get Verification OTP", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    Text("Get Verification OTP", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 }
-            }
-
-            AnimatedVisibility(visible = isOtpSent) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    OutlinedTextField(
-                        value = otpCode,
-                        onValueChange = { if (it.length <= 6) otpCode = it },
-                        label = { Text("Enter 6-Digit OTP") },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Button(
-                        onClick = {
-                            if (otpCode.length == 6) {
-                                onSuccess(name, "+91 $phone")
-                            } else {
-                                Toast.makeText(context, "Please enter a valid 6-digit OTP", Toast.LENGTH_SHORT).show()
-                            }
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(50.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    ) {
-                        Text("Verify & Continue", fontSize = 16.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    TextButton(
-                        onClick = { isOtpSent = false },
-                        modifier = Modifier.align(Alignment.CenterHorizontally)
-                    ) {
-                        Text("Change phone number")
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(30.dp))
-
-            // Note on Supabase Phone Auth
-            Card(
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant
-                ),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Row(
-                    modifier = Modifier.padding(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            } else {
+                Card(
+                    shape = RoundedCornerShape(12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Security,
-                        contentDescription = null,
-                        tint = BrandAccent,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Secured with Supabase Phone OTP. Role 'customer' assigned with Row Level Security (RLS).",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            text = "OTP sent to +91 $phoneNumber",
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = "Enter the 6-digit verification code below:",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = otpInput,
+                    onValueChange = { if (it.length <= 6) otpInput = it },
+                    label = { Text("Enter 6-Digit OTP") },
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Button(
+                    onClick = {
+                        if (otpInput.length == 6) {
+                            onSuccess(fullName, "+91 $phoneNumber")
+                        } else {
+                            Toast.makeText(context, "Please enter 6-digit OTP", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Verify & Continue", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TextButton(
+                    onClick = { isOtpSent = false },
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Text("Change Mobile Number")
                 }
             }
         }
     }
 }
 
+// FIX 2: Worker Registration Flow
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WorkerAuthScreen(
+    onBack: () -> Unit,
+    onSuccess: (name: String, phone: String, serviceType: String, area: String, exp: String, photoUrl: String) -> Unit
+) {
+    val context = LocalContext.current
+    var fullName by remember { mutableStateOf("") }
+    var phone by remember { mutableStateOf("") }
+    var selectedServiceType by remember { mutableStateOf(WorkerServiceTypes.ALL.first()) }
+    var customServiceType by remember { mutableStateOf("") }
+    var serviceExpanded by remember { mutableStateOf(false) }
+
+    var selectedArea by remember { mutableStateOf(HimmatnagarLocations.AREAS.first()) }
+    var customAreaInput by remember { mutableStateOf("") }
+    var showCustomAreaDialog by remember { mutableStateOf(false) }
+    var areaExpanded by remember { mutableStateOf(false) }
+
+    var experienceYears by remember { mutableStateOf("") }
+    var isOtpStep by remember { mutableStateOf(false) }
+    var otpCode by remember { mutableStateOf("") }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { Text("Worker Registration") },
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp)
+        ) {
+            Text(
+                text = "Register as a Worker in Himmatnagar",
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = "For plumbers, electricians, carpenters, painters, tutors, mechanics and repair technicians. Receive direct customer calls with no commission.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.outline
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            if (!isOtpStep) {
+                OutlinedTextField(
+                    value = fullName,
+                    onValueChange = { fullName = it },
+                    label = { Text("Full Name") },
+                    leadingIcon = { Icon(Icons.Default.Person, contentDescription = null) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                OutlinedTextField(
+                    value = phone,
+                    onValueChange = { if (it.length <= 10) phone = it },
+                    label = { Text("Mobile Phone Number (Calls & WhatsApp)") },
+                    prefix = { Text("+91 ") },
+                    leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Service Type Dropdown
+                ExposedDropdownMenuBox(
+                    expanded = serviceExpanded,
+                    onExpandedChange = { serviceExpanded = !serviceExpanded },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = selectedServiceType,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Service Type / Profession") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = serviceExpanded) },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = serviceExpanded,
+                        onDismissRequest = { serviceExpanded = false },
+                        modifier = Modifier.heightIn(max = 280.dp)
+                    ) {
+                        WorkerServiceTypes.ALL.forEach { sType ->
+                            DropdownMenuItem(
+                                text = { Text(sType) },
+                                onClick = {
+                                    selectedServiceType = sType
+                                    serviceExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                if (selectedServiceType == "Other") {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = customServiceType,
+                        onValueChange = { customServiceType = it },
+                        label = { Text("Specify Your Profession / Skill") },
+                        placeholder = { Text("e.g. Sofa Cleaner, Curtain Maker") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Location Dropdown with "Add New Location" (FIX 3)
+                ExposedDropdownMenuBox(
+                    expanded = areaExpanded,
+                    onExpandedChange = { areaExpanded = !areaExpanded },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    OutlinedTextField(
+                        value = selectedArea,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Himmatnagar Area / Ward") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = areaExpanded) },
+                        modifier = Modifier
+                            .menuAnchor()
+                            .fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = areaExpanded,
+                        onDismissRequest = { areaExpanded = false },
+                        modifier = Modifier.heightIn(max = 280.dp)
+                    ) {
+                        HimmatnagarLocations.AREAS.forEach { areaName ->
+                            DropdownMenuItem(
+                                text = { Text(areaName) },
+                                onClick = {
+                                    selectedArea = areaName
+                                    areaExpanded = false
+                                }
+                            )
+                        }
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.AddLocationAlt, contentDescription = null, tint = BrandPrimary, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Add New Location...", fontWeight = FontWeight.Bold, color = BrandPrimary)
+                                }
+                            },
+                            onClick = {
+                                areaExpanded = false
+                                showCustomAreaDialog = true
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                OutlinedTextField(
+                    value = experienceYears,
+                    onValueChange = { experienceYears = it },
+                    label = { Text("Years of Experience (Optional)") },
+                    placeholder = { Text("e.g. 5 Years Exp") },
+                    leadingIcon = { Icon(Icons.Default.WorkHistory, contentDescription = null) },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Button(
+                    onClick = {
+                        val effectiveService = if (selectedServiceType == "Other") customServiceType.trim() else selectedServiceType
+                        if (fullName.isBlank() || phone.length < 10 || effectiveService.isBlank()) {
+                            Toast.makeText(context, "Please enter your name, 10-digit phone and profession", Toast.LENGTH_SHORT).show()
+                        } else {
+                            isOtpStep = true
+                            otpCode = "729410"
+                            Toast.makeText(context, "OTP sent to +91 $phone (Demo code: 729410)", Toast.LENGTH_LONG).show()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Proceed to OTP Verification", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
+            } else {
+                // OTP Step
+                OutlinedTextField(
+                    value = otpCode,
+                    onValueChange = { if (it.length <= 6) otpCode = it },
+                    label = { Text("Enter 6-Digit Worker OTP") },
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = {
+                        if (otpCode.length == 6) {
+                            val finalService = if (selectedServiceType == "Other" && customServiceType.isNotBlank()) customServiceType.trim() else selectedServiceType
+                            onSuccess(
+                                fullName,
+                                "+91 $phone",
+                                finalService,
+                                selectedArea,
+                                experienceYears,
+                                ""
+                            )
+                        } else {
+                            Toast.makeText(context, "Please enter 6-digit OTP", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Text("Verify & Create Worker Profile", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                TextButton(
+                    onClick = { isOtpStep = false },
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Text("Back to Edit Details")
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+
+    if (showCustomAreaDialog) {
+        AlertDialog(
+            onDismissRequest = { showCustomAreaDialog = false },
+            title = { Text("Add New Location in Himmatnagar", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Enter locality, society or landmark name:")
+                    OutlinedTextField(
+                        value = customAreaInput,
+                        onValueChange = { customAreaInput = it },
+                        placeholder = { Text("e.g. Mehsana Highway, Shrinathji Nagar") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (customAreaInput.isNotBlank()) {
+                            HimmatnagarLocations.addCustomArea(customAreaInput)
+                            selectedArea = customAreaInput.trim()
+                            showCustomAreaDialog = false
+                            customAreaInput = ""
+                            Toast.makeText(context, "New location added to Himmatnagar list!", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    enabled = customAreaInput.isNotBlank()
+                ) {
+                    Text("Add Location")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCustomAreaDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+// FIX 1 & FIX 3: Business Owner Registration with full categories & expanded locations
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BusinessOwnerAuthScreen(
@@ -430,7 +788,7 @@ fun BusinessOwnerAuthScreen(
         shopName: String,
         ownerName: String,
         phone: String,
-        category: BusinessCategory,
+        category: String,
         area: String,
         address: String,
         whatsapp: String
@@ -441,12 +799,17 @@ fun BusinessOwnerAuthScreen(
     var ownerName by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var whatsapp by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf(BusinessCategory.ELECTRONICS) }
-    var selectedArea by remember { mutableStateOf(HimmatnagarLocations.AREAS.first()) }
-    var address by remember { mutableStateOf("") }
-    var isGpsPinned by remember { mutableStateOf(true) }
+    var selectedCategory by remember { mutableStateOf(BusinessCategories.ALL.first()) }
+    var customCategoryInput by remember { mutableStateOf("") }
     var categoryExpanded by remember { mutableStateOf(false) }
+
+    var selectedArea by remember { mutableStateOf(HimmatnagarLocations.AREAS.first()) }
+    var customAreaInput by remember { mutableStateOf("") }
+    var showCustomAreaDialog by remember { mutableStateOf(false) }
     var areaExpanded by remember { mutableStateOf(false) }
+
+    var address by remember { mutableStateOf("") }
+    var isGpsPinned by remember { mutableStateOf(false) }
     var isOtpStep by remember { mutableStateOf(false) }
     var otpCode by remember { mutableStateOf("") }
 
@@ -535,14 +898,14 @@ fun BusinessOwnerAuthScreen(
 
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Business Category Dropdown
+                // FIX 1: Business Category Dropdown with full categories list + "Other"
                 ExposedDropdownMenuBox(
                     expanded = categoryExpanded,
                     onExpandedChange = { categoryExpanded = !categoryExpanded },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     OutlinedTextField(
-                        value = selectedCategory.displayName,
+                        value = selectedCategory,
                         onValueChange = {},
                         readOnly = true,
                         label = { Text("Business Category") },
@@ -553,11 +916,12 @@ fun BusinessOwnerAuthScreen(
                     )
                     ExposedDropdownMenu(
                         expanded = categoryExpanded,
-                        onDismissRequest = { categoryExpanded = false }
+                        onDismissRequest = { categoryExpanded = false },
+                        modifier = Modifier.heightIn(max = 280.dp)
                     ) {
-                        BusinessCategory.values().forEach { category ->
+                        BusinessCategories.ALL.forEach { category ->
                             DropdownMenuItem(
-                                text = { Text(category.displayName) },
+                                text = { Text(category) },
                                 onClick = {
                                     selectedCategory = category
                                     categoryExpanded = false
@@ -567,9 +931,22 @@ fun BusinessOwnerAuthScreen(
                     }
                 }
 
+                // If "Other" selected, show custom text field (FIX 1)
+                if (selectedCategory == "Other") {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = customCategoryInput,
+                        onValueChange = { customCategoryInput = it },
+                        label = { Text("Type Your Business Category Name") },
+                        placeholder = { Text("e.g. Antique Store, Organic Nursery") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(14.dp))
 
-                // Himmatnagar Area Dropdown
+                // FIX 3: Expanded Himmatnagar Area Dropdown with "Add New Location"
                 ExposedDropdownMenuBox(
                     expanded = areaExpanded,
                     onExpandedChange = { areaExpanded = !areaExpanded },
@@ -587,7 +964,8 @@ fun BusinessOwnerAuthScreen(
                     )
                     ExposedDropdownMenu(
                         expanded = areaExpanded,
-                        onDismissRequest = { areaExpanded = false }
+                        onDismissRequest = { areaExpanded = false },
+                        modifier = Modifier.heightIn(max = 280.dp)
                     ) {
                         HimmatnagarLocations.AREAS.forEach { areaName ->
                             DropdownMenuItem(
@@ -598,6 +976,20 @@ fun BusinessOwnerAuthScreen(
                                 }
                             )
                         }
+                        HorizontalDivider()
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(Icons.Default.AddLocationAlt, contentDescription = null, tint = BrandPrimary, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text("Add New Location...", fontWeight = FontWeight.Bold, color = BrandPrimary)
+                                }
+                            },
+                            onClick = {
+                                areaExpanded = false
+                                showCustomAreaDialog = true
+                            }
+                        )
                     }
                 }
 
@@ -660,7 +1052,8 @@ fun BusinessOwnerAuthScreen(
 
                 Button(
                     onClick = {
-                        if (shopName.isBlank() || ownerName.isBlank() || phone.length < 10) {
+                        val effectiveCategory = if (selectedCategory == "Other") customCategoryInput.trim() else selectedCategory
+                        if (shopName.isBlank() || ownerName.isBlank() || phone.length < 10 || effectiveCategory.isBlank()) {
                             Toast.makeText(context, "Please complete all mandatory fields", Toast.LENGTH_SHORT).show()
                         } else {
                             isOtpStep = true
@@ -694,11 +1087,12 @@ fun BusinessOwnerAuthScreen(
                         if (otpCode.length == 6) {
                             val finalWhatsapp = if (whatsapp.isNotBlank()) "+91 $whatsapp" else "+91 $phone"
                             val finalAddress = if (address.isNotBlank()) address else "$selectedArea, Himmatnagar"
+                            val finalCategory = if (selectedCategory == "Other" && customCategoryInput.isNotBlank()) customCategoryInput.trim() else selectedCategory
                             onSuccess(
                                 shopName,
                                 ownerName,
                                 "+91 $phone",
-                                selectedCategory,
+                                finalCategory,
                                 selectedArea,
                                 finalAddress,
                                 finalWhatsapp
@@ -712,7 +1106,7 @@ fun BusinessOwnerAuthScreen(
                         .height(50.dp),
                     shape = RoundedCornerShape(12.dp)
                 ) {
-                    Text("Verify & Submit for Business Badge", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Text("Verify & Submit Business Profile", fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -727,5 +1121,45 @@ fun BusinessOwnerAuthScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
         }
+    }
+
+    if (showCustomAreaDialog) {
+        AlertDialog(
+            onDismissRequest = { showCustomAreaDialog = false },
+            title = { Text("Add New Location in Himmatnagar", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Enter area, society or landmark name:")
+                    OutlinedTextField(
+                        value = customAreaInput,
+                        onValueChange = { customAreaInput = it },
+                        placeholder = { Text("e.g. Mahavir Nagar Ext., Shrinathji Society") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (customAreaInput.isNotBlank()) {
+                            HimmatnagarLocations.addCustomArea(customAreaInput)
+                            selectedArea = customAreaInput.trim()
+                            showCustomAreaDialog = false
+                            customAreaInput = ""
+                            Toast.makeText(context, "New location added to Himmatnagar list!", Toast.LENGTH_SHORT).show()
+                        }
+                    },
+                    enabled = customAreaInput.isNotBlank()
+                ) {
+                    Text("Add Location")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCustomAreaDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 }

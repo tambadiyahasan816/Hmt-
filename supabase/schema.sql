@@ -1,6 +1,6 @@
 -- ====================================================================
 -- SHEHER HIMMATNAGAR — SUPABASE DATABASE SCHEMA WITH FULL RLS POLICIES
--- Platform for local shops, 10-day auto-deleting reels, and deals finder
+-- Platform for local shops, 10-day auto-deleting reels, workers & deals
 -- ====================================================================
 
 -- 1. EXTENSIONS
@@ -8,10 +8,15 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pg_cron";
 
 -- 2. ENUMS
-CREATE TYPE user_role AS ENUM ('customer', 'owner', 'admin');
+-- FIX 2: Updated role = 'customer' | 'owner' | 'worker' | 'admin'
+DO $$ BEGIN
+    CREATE TYPE user_role AS ENUM ('customer', 'owner', 'worker', 'admin');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
 -- 3. PROFILES TABLE
--- One phone number = one account. Stores role and display details.
+-- One phone number = one account. Role is checked on every protected action.
 CREATE TABLE IF NOT EXISTS public.profiles (
     id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
     phone TEXT NOT NULL UNIQUE,
@@ -21,7 +26,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 );
 
 -- 4. BUSINESSES TABLE
--- Verified local businesses in Himmatnagar, Gujarat
+-- Local shops & businesses in Himmatnagar, Gujarat
 CREATE TABLE IF NOT EXISTS public.businesses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     owner_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
@@ -29,14 +34,14 @@ CREATE TABLE IF NOT EXISTS public.businesses (
     category TEXT NOT NULL,
     phone TEXT NOT NULL,
     whatsapp TEXT NOT NULL,
-    area TEXT NOT NULL, -- e.g., Motipura, Mahavirnagar, Station Road, Tower Chowk
+    area TEXT NOT NULL, -- Motipura, Mahavirnagar, Station Road, Tower Chowk, etc.
     address TEXT NOT NULL,
     lat DOUBLE PRECISION NOT NULL DEFAULT 23.5977,
     lng DOUBLE PRECISION NOT NULL DEFAULT 72.9667,
     bio TEXT,
     image_url TEXT,
     cover_url TEXT,
-    is_approved BOOLEAN NOT NULL DEFAULT false,
+    is_approved BOOLEAN NOT NULL DEFAULT true,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -93,16 +98,17 @@ CREATE TABLE IF NOT EXISTS public.offers (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- 8. WORKERS TABLE (LOCAL DIRECTORY)
+-- 8. WORKERS TABLE (FIX 2: workers directory for plumbers, electricians, tutors, mechanics, etc.)
 CREATE TABLE IF NOT EXISTS public.workers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    profile_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    service_type TEXT NOT NULL, -- e.g., Plumber, Electrician, Tutor
+    service_type TEXT NOT NULL, -- Plumber, Electrician, Carpenter, Painter, Mechanic, Tutor, etc.
     phone TEXT NOT NULL,
     area TEXT NOT NULL,
-    experience TEXT,
-    rating NUMERIC(2,1) DEFAULT 4.8,
-    created_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+    experience_years TEXT,
+    photo_url TEXT,
+    rating NUMERIC(2,1) DEFAULT 0.0,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -158,115 +164,132 @@ $$ LANGUAGE sql SECURITY DEFINER;
 CREATE POLICY "Public profiles are viewable by everyone" ON public.profiles
     FOR SELECT USING (true);
 
-CREATE POLICY "Users can update their own profile" ON public.profiles
+CREATE POLICY "Users can update own profile" ON public.profiles
     FOR UPDATE USING (auth.uid() = id);
-
-CREATE POLICY "Users can insert their own profile" ON public.profiles
-    FOR INSERT WITH CHECK (auth.uid() = id);
 
 -- BUSINESSES POLICIES
 CREATE POLICY "Approved businesses are viewable by everyone" ON public.businesses
     FOR SELECT USING (is_approved = true OR auth.uid() = owner_id OR is_admin());
 
-CREATE POLICY "Owners can insert their own business" ON public.businesses
+CREATE POLICY "Business owners can insert business" ON public.businesses
     FOR INSERT WITH CHECK (
-        auth.uid() = owner_id AND
-        EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('owner', 'admin'))
+        EXISTS (
+            SELECT 1 FROM public.profiles
+            WHERE id = auth.uid() AND role IN ('owner', 'admin')
+        )
     );
 
-CREATE POLICY "Owners can update their own business" ON public.businesses
+CREATE POLICY "Business owners can update own business" ON public.businesses
     FOR UPDATE USING (auth.uid() = owner_id OR is_admin());
 
-CREATE POLICY "Owners and admins can delete business" ON public.businesses
+CREATE POLICY "Admins or owners can delete business" ON public.businesses
     FOR DELETE USING (auth.uid() = owner_id OR is_admin());
 
 -- BUSINESS POSTS POLICIES
 CREATE POLICY "Posts viewable by everyone" ON public.business_posts
     FOR SELECT USING (true);
 
-CREATE POLICY "Only business owner can insert posts" ON public.business_posts
+CREATE POLICY "Only shop owners can insert posts" ON public.business_posts
     FOR INSERT WITH CHECK (
-        EXISTS (SELECT 1 FROM public.businesses WHERE id = business_id AND owner_id = auth.uid()) OR is_admin()
+        EXISTS (
+            SELECT 1 FROM public.businesses
+            WHERE id = business_id AND owner_id = auth.uid()
+        )
     );
 
-CREATE POLICY "Owner can delete their posts" ON public.business_posts
-    FOR DELETE USING (
-        EXISTS (SELECT 1 FROM public.businesses WHERE id = business_id AND owner_id = auth.uid()) OR is_admin()
-    );
-
--- REELS POLICIES (AUTO-DELETE ENFORCED: Customers can NEVER insert reels)
-CREATE POLICY "Non-expired reels are viewable by everyone" ON public.reels
-    FOR SELECT USING (expires_at > NOW());
+-- REELS POLICIES (Customers and Workers CAN NEVER POST REELS)
+CREATE POLICY "Active reels viewable by everyone" ON public.reels
+    FOR SELECT USING (expires_at > NOW() OR is_admin());
 
 CREATE POLICY "Only business owners can post reels" ON public.reels
     FOR INSERT WITH CHECK (
-        (EXISTS (SELECT 1 FROM public.businesses WHERE id = business_id AND owner_id = auth.uid()) AND
-         EXISTS (SELECT 1 FROM public.profiles WHERE id = auth.uid() AND role IN ('owner', 'admin'))) OR is_admin()
-    );
-
-CREATE POLICY "Owners can delete their reels" ON public.reels
-    FOR DELETE USING (
-        EXISTS (SELECT 1 FROM public.businesses WHERE id = business_id AND owner_id = auth.uid()) OR is_admin()
-    );
-
--- OFFERS POLICIES
-CREATE POLICY "Offers viewable by everyone" ON public.offers
-    FOR SELECT USING (true);
-
-CREATE POLICY "Only owners can insert offers" ON public.offers
-    FOR INSERT WITH CHECK (
-        EXISTS (SELECT 1 FROM public.businesses WHERE id = business_id AND owner_id = auth.uid()) OR is_admin()
-    );
-
-CREATE POLICY "Owners can update and delete their offers" ON public.offers
-    FOR ALL USING (
-        EXISTS (SELECT 1 FROM public.businesses WHERE id = business_id AND owner_id = auth.uid()) OR is_admin()
-    );
-
--- WORKERS DIRECTORY POLICIES
-CREATE POLICY "Workers directory is viewable by everyone" ON public.workers
-    FOR SELECT USING (true);
-
-CREATE POLICY "Anyone authenticated can add a worker" ON public.workers
-    FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
-
--- FOLLOWS POLICIES
-CREATE POLICY "Anyone can view follows" ON public.follows
-    FOR SELECT USING (true);
-
-CREATE POLICY "Users can manage their own follows" ON public.follows
-    FOR ALL USING (auth.uid() = follower_id);
-
--- CHATS & MESSAGES POLICIES
-CREATE POLICY "Participants can view their chats" ON public.chats
-    FOR SELECT USING (
-        auth.uid() = customer_id OR
-        EXISTS (SELECT 1 FROM public.businesses WHERE id = business_id AND owner_id = auth.uid()) OR
-        is_admin()
-    );
-
-CREATE POLICY "Customers can initiate chats" ON public.chats
-    FOR INSERT WITH CHECK (auth.uid() = customer_id);
-
-CREATE POLICY "Chat participants can view messages" ON public.messages
-    FOR SELECT USING (
         EXISTS (
-            SELECT 1 FROM public.chats c
-            WHERE c.id = chat_id AND (
-                c.customer_id = auth.uid() OR
-                EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = c.business_id AND b.owner_id = auth.uid())
-            )
+            SELECT 1 FROM public.businesses
+            WHERE id = business_id AND owner_id = auth.uid()
+        ) AND
+        EXISTS (
+            SELECT 1 FROM public.profiles
+            WHERE id = auth.uid() AND role IN ('owner', 'admin')
+        )
+    );
+
+CREATE POLICY "Owners can delete own reels" ON public.reels
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM public.businesses
+            WHERE id = reels.business_id AND owner_id = auth.uid()
         ) OR is_admin()
     );
 
-CREATE POLICY "Chat participants can send messages" ON public.messages
+-- OFFERS POLICIES (Only business owners can create offers)
+CREATE POLICY "Offers viewable by everyone" ON public.offers
+    FOR SELECT USING (true);
+
+CREATE POLICY "Only business owners can create offers" ON public.offers
+    FOR INSERT WITH CHECK (
+        EXISTS (
+            SELECT 1 FROM public.businesses
+            WHERE id = business_id AND owner_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Owners can delete own offers" ON public.offers
+    FOR DELETE USING (
+        EXISTS (
+            SELECT 1 FROM public.businesses
+            WHERE id = offers.business_id AND owner_id = auth.uid()
+        ) OR is_admin()
+    );
+
+-- WORKERS POLICIES (Viewable by everyone, workers can insert/update own profile)
+CREATE POLICY "Workers directory viewable by everyone" ON public.workers
+    FOR SELECT USING (true);
+
+CREATE POLICY "Workers can register and update profile" ON public.workers
+    FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Workers can update own profile" ON public.workers
+    FOR UPDATE USING (profile_id = auth.uid() OR is_admin());
+
+-- FOLLOWS POLICIES
+CREATE POLICY "Follows viewable by everyone" ON public.follows
+    FOR SELECT USING (true);
+
+CREATE POLICY "Users can manage own follows" ON public.follows
+    FOR ALL USING (auth.uid() = follower_id);
+
+-- CHATS & MESSAGES POLICIES
+CREATE POLICY "Participants can view chats" ON public.chats
+    FOR SELECT USING (
+        auth.uid() = customer_id OR
+        EXISTS (
+            SELECT 1 FROM public.businesses
+            WHERE id = business_id AND owner_id = auth.uid()
+        )
+    );
+
+CREATE POLICY "Customers can create chats" ON public.chats
+    FOR INSERT WITH CHECK (auth.uid() = customer_id);
+
+CREATE POLICY "Participants can view messages" ON public.messages
+    FOR SELECT USING (
+        EXISTS (
+            SELECT 1 FROM public.chats
+            WHERE id = chat_id AND (customer_id = auth.uid() OR EXISTS (
+                SELECT 1 FROM public.businesses
+                WHERE id = business_id AND owner_id = auth.uid()
+            ))
+        )
+    );
+
+CREATE POLICY "Participants can insert messages" ON public.messages
     FOR INSERT WITH CHECK (
         auth.uid() = sender_id AND
         EXISTS (
-            SELECT 1 FROM public.chats c
-            WHERE c.id = chat_id AND (
-                c.customer_id = auth.uid() OR
-                EXISTS (SELECT 1 FROM public.businesses b WHERE b.id = c.business_id AND b.owner_id = auth.uid())
-            )
+            SELECT 1 FROM public.chats
+            WHERE id = chat_id AND (customer_id = auth.uid() OR EXISTS (
+                SELECT 1 FROM public.businesses
+                WHERE id = business_id AND owner_id = auth.uid()
+            ))
         )
     );

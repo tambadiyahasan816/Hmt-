@@ -26,10 +26,10 @@ import com.example.ui.screens.admin.AdminPanelScreen
 import com.example.ui.screens.auth.BusinessOwnerAuthScreen
 import com.example.ui.screens.auth.CustomerAuthScreen
 import com.example.ui.screens.auth.RoleSelectionScreen
+import com.example.ui.screens.auth.WorkerAuthScreen
 import com.example.ui.screens.chat.ChatScreen
 import com.example.ui.screens.explore.ExploreScreen
 import com.example.ui.screens.home.HomeScreen
-import com.example.ui.screens.offers.OffersScreen
 import com.example.ui.screens.profile.BusinessProfileScreen
 import com.example.ui.screens.profile.ProfileDashboardScreen
 import com.example.ui.screens.reels.ReelsScreen
@@ -62,6 +62,7 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
     val workers by viewModel.workers.collectAsStateWithLifecycle()
     val followedIds by viewModel.followedIds.collectAsStateWithLifecycle()
     val likedReelIds by viewModel.likedReelIds.collectAsStateWithLifecycle()
+    val businessViews by viewModel.businessViews.collectAsStateWithLifecycle()
     val selectedBusiness by viewModel.selectedBusiness.collectAsStateWithLifecycle()
     val chatBusiness by viewModel.chatBusiness.collectAsStateWithLifecycle()
     val chatMessages by viewModel.chatMessages.collectAsStateWithLifecycle()
@@ -76,6 +77,7 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
             RoleSelectionScreen(
                 onSelectCustomer = { viewModel.navigateTo(ScreenState.CUSTOMER_AUTH) },
                 onSelectOwner = { viewModel.navigateTo(ScreenState.OWNER_AUTH) },
+                onSelectWorker = { viewModel.navigateTo(ScreenState.WORKER_AUTH) },
                 onContinueAsGuest = { viewModel.continueAsGuest() }
             )
         }
@@ -98,6 +100,15 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
             )
         }
 
+        ScreenState.WORKER_AUTH -> {
+            WorkerAuthScreen(
+                onBack = { viewModel.handleBack() },
+                onSuccess = { name, phone, sType, area, exp, photoUrl ->
+                    viewModel.registerWorker(name, phone, sType, area, exp, photoUrl)
+                }
+            )
+        }
+
         ScreenState.BUSINESS_PROFILE -> {
             selectedBusiness?.let { business ->
                 BusinessProfileScreen(
@@ -109,8 +120,8 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
                     onStartChat = { viewModel.openChat(business) },
                     onBack = { viewModel.handleBack() },
                     onSelectOffer = {
-                        // Open offer in deals view
-                        viewModel.selectTab(3)
+                        // Open offer in explore deals
+                        viewModel.selectTab(1)
                     }
                 )
             } ?: run {
@@ -181,7 +192,7 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
                             colors = getNavColors(selectedTab == 2)
                         )
 
-                        // Tab 1: Explore
+                        // Tab 1: Explore (with Offers / Deals on top)
                         NavigationBarItem(
                             selected = selectedTab == 1,
                             onClick = { viewModel.selectTab(1) },
@@ -209,17 +220,17 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
                             colors = getNavColors(selectedTab == 2)
                         )
 
-                        // Tab 3: Offers
+                        // FIX 5: Tab 3: Workers with WRENCH ICON
                         NavigationBarItem(
                             selected = selectedTab == 3,
                             onClick = { viewModel.selectTab(3) },
                             icon = {
                                 Icon(
-                                    imageVector = if (selectedTab == 3) Icons.Filled.LocalOffer else Icons.Outlined.LocalOffer,
-                                    contentDescription = "Offers"
+                                    imageVector = if (selectedTab == 3) Icons.Filled.Build else Icons.Outlined.Build,
+                                    contentDescription = "Workers"
                                 )
                             },
-                            label = { Text("Offers", fontSize = 11.sp, fontWeight = if (selectedTab == 3) FontWeight.Bold else FontWeight.Normal) },
+                            label = { Text("Workers", fontSize = 11.sp, fontWeight = if (selectedTab == 3) FontWeight.Bold else FontWeight.Normal) },
                             colors = getNavColors(selectedTab == 2)
                         )
 
@@ -235,7 +246,11 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
                             },
                             label = {
                                 Text(
-                                    if (currentUser?.role == UserRole.OWNER) "Dashboard" else "Profile",
+                                    when (currentUser?.role) {
+                                        UserRole.OWNER -> "Dashboard"
+                                        UserRole.WORKER -> "My Profile"
+                                        else -> "Profile"
+                                    },
                                     fontSize = 11.sp,
                                     fontWeight = if (selectedTab == 4) FontWeight.Bold else FontWeight.Normal
                                 )
@@ -253,17 +268,17 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
                             followedIds = followedIds,
                             onFollowClick = { viewModel.toggleFollow(it) },
                             onSelectBusiness = { viewModel.openBusinessProfile(it) },
-                            onSelectOffer = { viewModel.selectTab(3) },
-                            onNavigateToOffersTab = { viewModel.selectTab(3) },
+                            onSelectOffer = { viewModel.selectTab(1) },
                             onNavigateToExplore = { viewModel.selectTab(1) }
                         )
 
                         1 -> ExploreScreen(
                             businesses = businesses,
+                            offers = offers,
                             followedIds = followedIds,
                             onFollowClick = { viewModel.toggleFollow(it) },
                             onSelectBusiness = { viewModel.openBusinessProfile(it) },
-                            onOpenWorkerDirectory = { viewModel.navigateTo(ScreenState.WORKER_DIRECTORY) }
+                            onOpenWorkerDirectory = { viewModel.selectTab(3) }
                         )
 
                         2 -> ReelsScreen(
@@ -276,10 +291,12 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
                             onUploadReel = { title, caption -> viewModel.uploadReel(title, caption) }
                         )
 
-                        3 -> OffersScreen(
-                            offers = offers,
-                            businesses = businesses,
-                            onSelectBusiness = { viewModel.openBusinessProfile(it) }
+                        3 -> WorkerDirectoryScreen(
+                            workers = workers,
+                            onAddWorker = { name, sType, phone, area, exp ->
+                                viewModel.addWorker(name, sType, phone, area, exp)
+                            },
+                            onBack = null
                         )
 
                         4 -> ProfileDashboardScreen(
@@ -287,6 +304,8 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
                             businesses = businesses,
                             reels = reels,
                             offers = offers,
+                            workers = workers,
+                            businessViews = businessViews,
                             followedIds = followedIds,
                             onSelectBusiness = { viewModel.openBusinessProfile(it) },
                             onStartChat = { viewModel.openChat(it) },
@@ -298,6 +317,9 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
                             onUploadReel = { t, c -> viewModel.uploadReel(t, c) },
                             onUpdateBusiness = { bId, bio, ph, wa, addr ->
                                 viewModel.updateBusinessDetails(bId, bio, ph, wa, addr)
+                            },
+                            onUpdateWorker = { wId, name, sType, ph, area, exp ->
+                                viewModel.updateWorkerProfile(wId, name, sType, ph, area, exp)
                             },
                             onSwitchRole = { viewModel.switchRole(it) },
                             onOpenAdminPanel = { viewModel.navigateTo(ScreenState.ADMIN_PANEL) },

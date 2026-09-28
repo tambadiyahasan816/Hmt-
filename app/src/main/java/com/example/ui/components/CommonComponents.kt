@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,17 +11,14 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
@@ -32,34 +28,17 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Business
-import com.example.data.model.BusinessCategory
 import com.example.data.model.Offer
+import com.example.data.model.Worker
 import com.example.ui.theme.*
 
+// FIX 4: VERIFIED_BADGE_HIDDEN — will be used for paid plans later
+// The green "VERIFIED" badge is removed/hidden from ALL business cards and profiles everywhere in the app.
+// Do not delete the feature from code — just hide it from UI.
 @Composable
 fun VerifiedBadge(modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(VerifiedBadgeBlue.copy(alpha = 0.15f))
-            .padding(horizontal = 6.dp, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp)
-    ) {
-        Icon(
-            imageVector = Icons.Default.CheckCircle,
-            contentDescription = "Verified Business",
-            tint = VerifiedBadgeBlue,
-            modifier = Modifier.size(13.dp)
-        )
-        Text(
-            text = "VERIFIED",
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Bold,
-            color = VerifiedBadgeBlue,
-            letterSpacing = 0.5.sp
-        )
-    }
+    // VERIFIED_BADGE_HIDDEN — will be used for paid plans later
+    // Purposefully rendering nothing so the badge is hidden across the application.
 }
 
 @Composable
@@ -97,23 +76,37 @@ fun ExpiryCountdownBadge(
 
 @Composable
 fun CategoryIcon(
-    category: BusinessCategory,
+    category: String,
     size: Int = 20,
     tint: Color = MaterialTheme.colorScheme.primary
 ) {
-    val icon = when (category) {
-        BusinessCategory.FOOD -> Icons.Default.Restaurant
-        BusinessCategory.FASHION -> Icons.Default.ShoppingBag
-        BusinessCategory.ELECTRONICS -> Icons.Default.Smartphone
-        BusinessCategory.MEDICAL -> Icons.Default.LocalHospital
-        BusinessCategory.SERVICES -> Icons.Default.Build
-        BusinessCategory.GROCERY -> Icons.Default.ShoppingCart
-        BusinessCategory.JEWELRY -> Icons.Default.Diamond
-        BusinessCategory.AUTO -> Icons.Default.DirectionsCar
+    val icon = when {
+        category.contains("Food", ignoreCase = true) || category.contains("Dining", ignoreCase = true) || category.contains("Tiffin", ignoreCase = true) -> Icons.Default.Restaurant
+        category.contains("Dairy", ignoreCase = true) || category.contains("Sweets", ignoreCase = true) -> Icons.Default.Cake
+        category.contains("Fashion", ignoreCase = true) || category.contains("Wear", ignoreCase = true) || category.contains("Footwear", ignoreCase = true) -> Icons.Default.ShoppingBag
+        category.contains("Mobile", ignoreCase = true) || category.contains("Gadgets", ignoreCase = true) -> Icons.Default.Smartphone
+        category.contains("Electronics", ignoreCase = true) || category.contains("Appliances", ignoreCase = true) -> Icons.Default.Tv
+        category.contains("Medical", ignoreCase = true) || category.contains("Pharma", ignoreCase = true) -> Icons.Default.LocalHospital
+        category.contains("Grocery", ignoreCase = true) || category.contains("Mart", ignoreCase = true) -> Icons.Default.ShoppingCart
+        category.contains("Jewelry", ignoreCase = true) || category.contains("Gold", ignoreCase = true) -> Icons.Default.Diamond
+        category.contains("Auto", ignoreCase = true) || category.contains("Vehicles", ignoreCase = true) -> Icons.Default.DirectionsCar
+        category.contains("Furniture", ignoreCase = true) || category.contains("Home", ignoreCase = true) -> Icons.Default.Home
+        category.contains("Beauty", ignoreCase = true) || category.contains("Salon", ignoreCase = true) -> Icons.Default.Face
+        category.contains("Gym", ignoreCase = true) || category.contains("Fitness", ignoreCase = true) -> Icons.Default.FitnessCenter
+        category.contains("Education", ignoreCase = true) || category.contains("Books", ignoreCase = true) -> Icons.Default.MenuBook
+        category.contains("Hardware", ignoreCase = true) || category.contains("Electrical", ignoreCase = true) -> Icons.Default.Hardware
+        category.contains("Travel", ignoreCase = true) || category.contains("Courier", ignoreCase = true) -> Icons.Default.LocalShipping
+        category.contains("Real Estate", ignoreCase = true) -> Icons.Default.Apartment
+        category.contains("Photo", ignoreCase = true) -> Icons.Default.CameraAlt
+        category.contains("Toys", ignoreCase = true) || category.contains("Gifts", ignoreCase = true) -> Icons.Default.CardGiftcard
+        category.contains("Wedding", ignoreCase = true) -> Icons.Default.Celebration
+        category.contains("Pet", ignoreCase = true) -> Icons.Default.Pets
+        category.contains("Agriculture", ignoreCase = true) -> Icons.Default.Grass
+        else -> Icons.Default.Storefront
     }
     Icon(
         imageVector = icon,
-        contentDescription = category.displayName,
+        contentDescription = category,
         tint = tint,
         modifier = Modifier.size(size.dp)
     )
@@ -172,6 +165,7 @@ fun BusinessCard(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
                         )
+                        // VERIFIED_BADGE_HIDDEN — will be used for paid plans later
                         if (business.isApproved) {
                             VerifiedBadge()
                         }
@@ -184,7 +178,7 @@ fun BusinessCard(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
-                            text = business.category.displayName,
+                            text = business.category,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.primary
                         )
@@ -222,7 +216,7 @@ fun BusinessCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Action Row: Rating, Call, WhatsApp, Open Profile
+            // Action Row: Rating / New Badge, Followers, Call, WhatsApp, Open Profile
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -232,22 +226,40 @@ fun BusinessCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = "Rating",
-                        tint = GoldenStar,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Text(
-                        text = "${business.rating}",
-                        style = MaterialTheme.typography.labelMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "(${business.reviewCount})",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.outline
-                    )
+                    if (business.rating > 0f) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = "Rating",
+                            tint = GoldenStar,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            text = String.format("%.1f", business.rating),
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (business.reviewCount > 0) {
+                            Text(
+                                text = "(${business.reviewCount})",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    } else {
+                        Surface(
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            shape = RoundedCornerShape(4.dp)
+                        ) {
+                            Text(
+                                text = "New",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
+
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = "${business.followerCount} followers",
@@ -291,6 +303,104 @@ fun BusinessCard(
                     ) {
                         Text(text = "View", fontSize = 12.sp)
                     }
+                }
+            }
+        }
+    }
+}
+
+// FIX 2: Workers get a simple profile card: name, service, area, experience, tap-to-call button, WhatsApp button.
+@Composable
+fun WorkerCard(
+    worker: Worker,
+    onCallClick: () -> Unit,
+    onWhatsAppClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(CircleShape)
+                    .background(BrandPrimaryContainer),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Engineering,
+                    contentDescription = null,
+                    tint = BrandPrimary,
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = worker.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = worker.serviceType,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = BrandPrimary,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "📍 ${worker.area}",
+                        fontSize = 11.sp,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    if (worker.experienceYears.isNotBlank()) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "• ${worker.experienceYears}",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                FilledTonalIconButton(
+                    onClick = onCallClick,
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Phone,
+                        contentDescription = "Call",
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                FilledTonalIconButton(
+                    onClick = onWhatsAppClick,
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = WhatsAppGreen.copy(alpha = 0.15f),
+                        contentColor = WhatsAppGreen
+                    ),
+                    modifier = Modifier.size(38.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Send,
+                        contentDescription = "WhatsApp",
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }
@@ -475,7 +585,7 @@ fun launchDialer(context: Context, phone: String) {
 fun launchWhatsApp(context: Context, phoneOrWhatsapp: String) {
     try {
         val cleanNumber = phoneOrWhatsapp.replace("+", "").replace(" ", "").replace("-", "")
-        val url = "https://api.whatsapp.com/send?phone=$cleanNumber&text=Hello,%20I%20found%20your%20shop%20on%20Sheher%20Himmatnagar%20App!"
+        val url = "https://api.whatsapp.com/send?phone=$cleanNumber&text=Hello,%20I%20found%20you%20on%20Sheher%20Himmatnagar%20App!"
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
         context.startActivity(intent)
     } catch (e: Exception) {
@@ -489,7 +599,6 @@ fun launchGoogleMaps(context: Context, lat: Double, lng: Double, shopName: Strin
         val intent = Intent(Intent.ACTION_VIEW, uri)
         context.startActivity(intent)
     } catch (e: Exception) {
-        // Fallback to web maps
         val webUri = Uri.parse("https://maps.google.com/?q=$lat,$lng")
         val webIntent = Intent(Intent.ACTION_VIEW, webUri)
         context.startActivity(webIntent)

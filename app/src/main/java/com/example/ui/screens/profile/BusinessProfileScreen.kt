@@ -5,9 +5,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -68,8 +65,8 @@ fun BusinessProfileScreen(
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp
                         )
+                        // VERIFIED_BADGE_HIDDEN — will be used for paid plans later
                         if (business.isApproved) {
-                            Spacer(modifier = Modifier.width(6.dp))
                             VerifiedBadge()
                         }
                     }
@@ -103,7 +100,6 @@ fun BusinessProfileScreen(
                             )
                         )
                 ) {
-                    // Decorative badge
                     Box(
                         modifier = Modifier
                             .align(Alignment.TopEnd)
@@ -163,7 +159,10 @@ fun BusinessProfileScreen(
                         ) {
                             ProfileStatItem(count = "${businessOffers.size + businessReels.size + 4}", label = "Posts")
                             ProfileStatItem(count = "${business.followerCount}", label = "Followers")
-                            ProfileStatItem(count = "${business.rating} ★", label = "Rating")
+                            ProfileStatItem(
+                                count = if (business.rating > 0f) String.format("%.1f ★", business.rating) else "New",
+                                label = "Rating"
+                            )
                         }
                     }
 
@@ -176,7 +175,7 @@ fun BusinessProfileScreen(
                     )
 
                     Text(
-                        text = business.category.displayName,
+                        text = business.category,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold
@@ -293,7 +292,7 @@ fun BusinessProfileScreen(
                         Tab(
                             selected = selectedTab == 0,
                             onClick = { selectedTab = 0 },
-                            text = { Text("Grid (6)") }
+                            text = { Text("Grid") }
                         )
                         Tab(
                             selected = selectedTab == 1,

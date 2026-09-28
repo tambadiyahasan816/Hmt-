@@ -10,6 +10,7 @@ val BrandSecondary = Color(0xFFF59E0B)     // Warm Saffron Gold (Gujarat heritag
 val BrandSecondaryDark = Color(0xFFD97706)
 val BrandAccent = Color(0xFF10B981)        // Emerald Green (Verified/Success)
 val BrandAccentDark = Color(0xFF047857)
+val SuccessGreen = Color(0xFF10B981)
 
 val DarkBackground = Color(0xFF0F172A)     // Rich Slate Dark
 val DarkSurface = Color(0xFF1E293B)        // Elevated Slate

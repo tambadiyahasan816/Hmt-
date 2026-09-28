@@ -1,37 +1,111 @@
 package com.example.data.model
 
+import androidx.compose.runtime.mutableStateListOf
 import java.util.concurrent.TimeUnit
 
 enum class UserRole {
     CUSTOMER,
     OWNER,
+    WORKER,
     ADMIN
 }
 
-enum class BusinessCategory(val displayName: String, val iconName: String) {
-    FOOD("Food & Dining", "restaurant"),
-    FASHION("Fashion & Wear", "checkroom"),
-    ELECTRONICS("Mobile & Gadgets", "smartphone"),
-    MEDICAL("Medical & Pharma", "local_hospital"),
-    SERVICES("Home & Services", "build"),
-    GROCERY("Grocery & Mart", "shopping_cart"),
-    JEWELRY("Jewelry & Gold", "diamond"),
-    AUTO("Auto & Vehicles", "directions_car")
+object BusinessCategories {
+    val ALL = listOf(
+        "Food & Dining",
+        "Fashion & Wear",
+        "Mobile & Gadgets",
+        "Medical & Pharma",
+        "Home & Services",
+        "Grocery & Mart",
+        "Jewelry & Gold",
+        "Auto & Vehicles",
+        "Electronics & Appliances",
+        "Furniture & Home Decor",
+        "Footwear",
+        "Beauty & Salon",
+        "Gym & Fitness",
+        "Education & Coaching",
+        "Books & Stationery",
+        "Hardware & Paint",
+        "Electrical & Sanitary Goods",
+        "Travel & Transport",
+        "Real Estate",
+        "Printing & Xerox",
+        "Courier & Logistics",
+        "Photo Studio",
+        "Toys & Gifts",
+        "Dairy & Sweets",
+        "Tiffin & Catering",
+        "Wedding & Event Services",
+        "Pet Shop",
+        "Agriculture & Seeds",
+        "Other"
+    )
+}
+
+object WorkerServiceTypes {
+    val ALL = listOf(
+        "Plumber",
+        "Electrician",
+        "Carpenter",
+        "Painter",
+        "Mechanic",
+        "Tutor",
+        "AC/TV/Fridge Repair",
+        "Mason",
+        "Driver",
+        "Tailor",
+        "Cook",
+        "Cleaner",
+        "Beautician",
+        "Other"
+    )
 }
 
 object HimmatnagarLocations {
-    val AREAS = listOf(
+    private val _areas = mutableStateListOf(
         "Motipura",
         "Mahavirnagar",
         "Station Road",
         "Tower Chowk",
         "Polo Ground",
-        "Nyay Mandir",
-        "Himat High School Road",
-        "Bypass Road",
-        "Sahakari Jin Road",
-        "Civil Hospital Area"
+        "Ganesh Baug",
+        "Vaktanagar",
+        "Gayatri Nagar",
+        "Sant Kabir Nagar",
+        "Bhatvarna",
+        "Devipujak Vas",
+        "Chiloda",
+        "RTO Circle",
+        "Khedapa Road",
+        "Idar Road",
+        "Shamlaji Road",
+        "New CB Patel Road",
+        "Sardar Patel Circle",
+        "Municipal Colony",
+        "GIDC Area",
+        "Khadpa",
+        "Sabalagadh Road",
+        "Dabhoda",
+        "Bhoyan",
+        "Panpur Patiya",
+        "Other"
     )
+
+    val AREAS: List<String> get() = _areas
+
+    fun addCustomArea(newArea: String) {
+        val trimmed = newArea.trim()
+        if (trimmed.isNotBlank() && !_areas.any { it.equals(trimmed, ignoreCase = true) }) {
+            val otherIdx = _areas.indexOf("Other")
+            if (otherIdx >= 0) {
+                _areas.add(otherIdx, trimmed)
+            } else {
+                _areas.add(trimmed)
+            }
+        }
+    }
 
     // Central Himmatnagar Coordinates
     const val CENTER_LAT = 23.5977
@@ -50,7 +124,7 @@ data class Business(
     val id: String,
     val ownerId: String,
     val name: String,
-    val category: BusinessCategory,
+    val category: String,
     val phone: String,
     val whatsapp: String,
     val area: String,
@@ -61,9 +135,9 @@ data class Business(
     val imageUrl: String = "",
     val coverUrl: String = "",
     val isApproved: Boolean = true,
-    val followerCount: Int = 120,
-    val rating: Float = 4.7f,
-    val reviewCount: Int = 38,
+    val followerCount: Int = 0,
+    val rating: Float = 0f,
+    val reviewCount: Int = 0,
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -72,7 +146,7 @@ data class BusinessPost(
     val businessId: String,
     val imageUrl: String,
     val caption: String,
-    val likes: Int = 42,
+    val likes: Int = 0,
     val createdAt: Long = System.currentTimeMillis()
 )
 
@@ -86,10 +160,10 @@ data class Reel(
     val videoUrl: String = "",
     val title: String,
     val caption: String,
-    val likes: Int = 85,
-    val views: Int = 420,
-    val createdAt: Long = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2), // default 2 days ago
-    val expiresAt: Long = createdAt + TimeUnit.DAYS.toMillis(10), // 10 days strictly
+    val likes: Int = 0,
+    val views: Int = 0,
+    val createdAt: Long = System.currentTimeMillis() - TimeUnit.DAYS.toMillis(2),
+    val expiresAt: Long = createdAt + TimeUnit.DAYS.toMillis(10), // strictly 10 days
     val gradientColorIndex: Int = 0
 ) {
     fun getRemainingDays(currentTime: Long = System.currentTimeMillis()): Int {
@@ -112,7 +186,7 @@ data class Offer(
     val businessName: String,
     val area: String,
     val productName: String,
-    val category: BusinessCategory,
+    val category: String,
     val originalPrice: Double,
     val discountedPrice: Double,
     val discountPercent: Int,
@@ -123,13 +197,17 @@ data class Offer(
 
 data class Worker(
     val id: String,
+    val profileId: String = "",
     val name: String,
     val serviceType: String,
     val phone: String,
+    val whatsapp: String = "",
     val area: String,
-    val experience: String,
-    val rating: Float = 4.8f,
-    val createdBy: String = "Community"
+    val experienceYears: String = "",
+    val photoUrl: String = "",
+    val rating: Float = 0f,
+    val createdBy: String = "Community",
+    val createdAt: Long = System.currentTimeMillis()
 )
 
 data class ChatMessage(

@@ -164,7 +164,7 @@ fun AdminPanelScreen(
                                             Spacer(modifier = Modifier.width(4.dp))
                                             if (shop.isApproved) VerifiedBadge()
                                         }
-                                        Text("${shop.category.displayName} • ${shop.area}", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
+                                        Text("${shop.category} • ${shop.area}", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
                                         Text("Owner Phone: ${shop.phone}", fontSize = 11.sp, color = BrandPrimary)
                                     }
 

@@ -2,12 +2,10 @@ package com.example.ui.screens.workers
 
 import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -17,7 +15,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -26,25 +23,27 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.HimmatnagarLocations
 import com.example.data.model.Worker
+import com.example.data.model.WorkerServiceTypes
+import com.example.ui.components.WorkerCard
 import com.example.ui.components.launchDialer
 import com.example.ui.components.launchWhatsApp
 import com.example.ui.theme.*
 
+// FIX 5: Worker Directory Tab screen with search, service type filter & area filter
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WorkerDirectoryScreen(
     workers: List<Worker>,
     onAddWorker: (name: String, serviceType: String, phone: String, area: String, exp: String) -> Unit,
-    onBack: () -> Unit
+    onBack: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
     var selectedServiceType by remember { mutableStateOf<String?>(null) }
+    var selectedArea by remember { mutableStateOf<String?>(null) }
     var showAddDialog by remember { mutableStateOf(false) }
 
-    val serviceTypes = listOf("All", "Plumber", "Electrician", "AC Repair & Technician", "Mathematics & Science Tutor", "Carpenter & Wood Interior", "House Painter")
-
-    val filteredWorkers = remember(workers, searchQuery, selectedServiceType) {
+    val filteredWorkers = remember(workers, searchQuery, selectedServiceType, selectedArea) {
         workers.filter { w ->
             val matchQuery = searchQuery.isBlank() ||
                     w.name.contains(searchQuery, ignoreCase = true) ||
@@ -54,7 +53,10 @@ fun WorkerDirectoryScreen(
             val matchType = selectedServiceType == null || selectedServiceType == "All" ||
                     w.serviceType.contains(selectedServiceType!!, ignoreCase = true)
 
-            matchQuery && matchType
+            val matchArea = selectedArea == null || selectedArea == "All" ||
+                    w.area.equals(selectedArea, ignoreCase = true)
+
+            matchQuery && matchType && matchArea
         }
     }
 
@@ -64,12 +66,21 @@ fun WorkerDirectoryScreen(
                 title = {
                     Column {
                         Text("Himmatnagar Worker Directory", fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                        Text("Plumbers, Electricians, Tutors & Mechanics", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
+                        Text("Plumbers, Electricians, Carpenters & Technicians", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Build,
+                            contentDescription = null,
+                            tint = BrandPrimary,
+                            modifier = Modifier.padding(start = 16.dp, end = 8.dp).size(22.dp)
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface)
@@ -100,6 +111,13 @@ fun WorkerDirectoryScreen(
                     onValueChange = { searchQuery = it },
                     placeholder = { Text("Search by name, service or area (e.g. Plumber, Motipura)...") },
                     leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = BrandPrimary) },
+                    trailingIcon = {
+                        if (searchQuery.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery = "" }) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    },
                     singleLine = true,
                     shape = RoundedCornerShape(14.dp),
                     colors = OutlinedTextFieldDefaults.colors(
@@ -112,18 +130,66 @@ fun WorkerDirectoryScreen(
 
             // Service Type Chips
             item {
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(serviceTypes) { sType ->
-                        val isSelected = (selectedServiceType == null && sType == "All") || selectedServiceType == sType
-                        FilterChip(
-                            selected = isSelected,
-                            onClick = {
-                                selectedServiceType = if (sType == "All") null else sType
-                            },
-                            label = { Text(sType) }
-                        )
+                Column {
+                    Text(
+                        text = "Filter by Profession / Service:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item {
+                            FilterChip(
+                                selected = selectedServiceType == null,
+                                onClick = { selectedServiceType = null },
+                                label = { Text("All Services") }
+                            )
+                        }
+                        items(WorkerServiceTypes.ALL.filter { it != "Other" }) { sType ->
+                            FilterChip(
+                                selected = selectedServiceType == sType,
+                                onClick = {
+                                    selectedServiceType = if (selectedServiceType == sType) null else sType
+                                },
+                                label = { Text(sType) }
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Area Filter Chips
+            item {
+                Column {
+                    Text(
+                        text = "Filter by Himmatnagar Locality:",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item {
+                            FilterChip(
+                                selected = selectedArea == null,
+                                onClick = { selectedArea = null },
+                                label = { Text("All Areas") }
+                            )
+                        }
+                        items(HimmatnagarLocations.AREAS) { area ->
+                            FilterChip(
+                                selected = selectedArea == area,
+                                onClick = {
+                                    selectedArea = if (selectedArea == area) null else area
+                                },
+                                label = { Text(area) }
+                            )
+                        }
                     }
                 }
             }
@@ -131,93 +197,40 @@ fun WorkerDirectoryScreen(
             // Results count
             item {
                 Text(
-                    text = "${filteredWorkers.size} service providers available in Himmatnagar",
+                    text = "${filteredWorkers.size} workers & service technicians available",
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.outline
                 )
             }
 
-            // Worker Cards
-            items(filteredWorkers, key = { it.id }) { worker ->
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                ) {
-                    Row(
+            if (filteredWorkers.isEmpty()) {
+                item {
+                    Card(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(14.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(vertical = 16.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                     ) {
-                        // Worker Glyph
-                        Box(
-                            modifier = Modifier
-                                .size(48.dp)
-                                .clip(CircleShape)
-                                .background(BrandPrimaryContainer),
-                            contentAlignment = Alignment.Center
+                        Column(
+                            modifier = Modifier.padding(24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Engineering,
-                                contentDescription = null,
-                                tint = BrandPrimary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = worker.name,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.Bold
-                            )
-                            Text(
-                                text = worker.serviceType,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = BrandPrimary,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = "📍 ${worker.area}",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text(
-                                    text = "• ${worker.experience}",
-                                    fontSize = 11.sp,
-                                    color = MaterialTheme.colorScheme.outline
-                                )
-                            }
-                        }
-
-                        // Call & WhatsApp Buttons
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            FilledTonalIconButton(
-                                onClick = { launchDialer(context, worker.phone) },
-                                modifier = Modifier.size(38.dp)
-                            ) {
-                                Icon(Icons.Default.Phone, contentDescription = "Call", modifier = Modifier.size(18.dp))
-                            }
-
-                            FilledTonalIconButton(
-                                onClick = { launchWhatsApp(context, worker.phone) },
-                                colors = IconButtonDefaults.filledTonalIconButtonColors(
-                                    containerColor = WhatsAppGreen.copy(alpha = 0.15f),
-                                    contentColor = WhatsAppGreen
-                                ),
-                                modifier = Modifier.size(38.dp)
-                            ) {
-                                Icon(Icons.Default.Send, contentDescription = "WhatsApp", modifier = Modifier.size(18.dp))
-                            }
+                            Icon(Icons.Default.Engineering, contentDescription = null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(40.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("No workers found", fontWeight = FontWeight.Bold)
+                            Text("Try clearing filters or search query to see all Himmatnagar workers.", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
                         }
                     }
+                }
+            } else {
+                // Worker Cards with Call & WhatsApp Buttons
+                items(filteredWorkers, key = { it.id }) { worker ->
+                    WorkerCard(
+                        worker = worker,
+                        onCallClick = { launchDialer(context, worker.phone) },
+                        onWhatsAppClick = { launchWhatsApp(context, worker.phone) }
+                    )
                 }
             }
 
@@ -246,11 +259,14 @@ fun AddWorkerDialog(
     onAdd: (name: String, serviceType: String, phone: String, area: String, exp: String) -> Unit
 ) {
     var name by remember { mutableStateOf("") }
-    var serviceType by remember { mutableStateOf("") }
+    var serviceType by remember { mutableStateOf(WorkerServiceTypes.ALL.first()) }
+    var customServiceType by remember { mutableStateOf("") }
+    var serviceExpanded by remember { mutableStateOf(false) }
+
     var phone by remember { mutableStateOf("") }
     var area by remember { mutableStateOf(HimmatnagarLocations.AREAS.first()) }
-    var exp by remember { mutableStateOf("") }
     var areaExpanded by remember { mutableStateOf(false) }
+    var exp by remember { mutableStateOf("") }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -273,13 +289,45 @@ fun AddWorkerDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                OutlinedTextField(
-                    value = serviceType,
-                    onValueChange = { serviceType = it },
-                    label = { Text("Service Type (e.g. Plumber, Tutor)") },
-                    singleLine = true,
+                ExposedDropdownMenuBox(
+                    expanded = serviceExpanded,
+                    onExpandedChange = { serviceExpanded = !serviceExpanded },
                     modifier = Modifier.fillMaxWidth()
-                )
+                ) {
+                    OutlinedTextField(
+                        value = serviceType,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Service Type / Profession") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = serviceExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(
+                        expanded = serviceExpanded,
+                        onDismissRequest = { serviceExpanded = false },
+                        modifier = Modifier.heightIn(max = 240.dp)
+                    ) {
+                        WorkerServiceTypes.ALL.forEach { s ->
+                            DropdownMenuItem(
+                                text = { Text(s) },
+                                onClick = {
+                                    serviceType = s
+                                    serviceExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                if (serviceType == "Other") {
+                    OutlinedTextField(
+                        value = customServiceType,
+                        onValueChange = { customServiceType = it },
+                        label = { Text("Specify Profession") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
                 OutlinedTextField(
                     value = phone,
@@ -306,7 +354,8 @@ fun AddWorkerDialog(
                     )
                     ExposedDropdownMenu(
                         expanded = areaExpanded,
-                        onDismissRequest = { areaExpanded = false }
+                        onDismissRequest = { areaExpanded = false },
+                        modifier = Modifier.heightIn(max = 240.dp)
                     ) {
                         HimmatnagarLocations.AREAS.forEach { a ->
                             DropdownMenuItem(
@@ -330,13 +379,14 @@ fun AddWorkerDialog(
             }
         },
         confirmButton = {
+            val effectiveService = if (serviceType == "Other") customServiceType.trim() else serviceType
             Button(
                 onClick = {
-                    if (name.isNotBlank() && serviceType.isNotBlank() && phone.length >= 10) {
-                        onAdd(name, serviceType, "+91 $phone", area, if (exp.isNotBlank()) exp else "Experienced")
+                    if (name.isNotBlank() && effectiveService.isNotBlank() && phone.length >= 10) {
+                        onAdd(name, effectiveService, "+91 $phone", area, if (exp.isNotBlank()) exp else "Experienced")
                     }
                 },
-                enabled = name.isNotBlank() && serviceType.isNotBlank() && phone.length >= 10
+                enabled = name.isNotBlank() && effectiveService.isNotBlank() && phone.length >= 10
             ) {
                 Text("Add Listing")
             }

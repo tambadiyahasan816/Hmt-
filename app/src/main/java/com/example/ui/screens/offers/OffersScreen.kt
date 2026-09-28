@@ -2,7 +2,6 @@ package com.example.ui.screens.offers
 
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -20,10 +19,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Business
-import com.example.data.model.BusinessCategory
+import com.example.data.model.BusinessCategories
 import com.example.data.model.HimmatnagarLocations
 import com.example.data.model.Offer
-import com.example.ui.components.CategoryIcon
 import com.example.ui.components.OfferCard
 import com.example.ui.theme.*
 
@@ -35,21 +33,19 @@ fun OffersScreen(
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
-    var selectedCategory by remember { mutableStateOf<BusinessCategory?>(null) }
+    var selectedCategory by remember { mutableStateOf<String?>(null) }
     var selectedArea by remember { mutableStateOf<String?>(null) }
     var sortByHighestDiscount by remember { mutableStateOf(true) }
-
-    val quickSearches = listOf("iPhone 18 Pro", "Kurti", "Thali", "Almonds", "Watch", "Ceramic Coating")
 
     val filteredOffers = remember(offers, searchQuery, selectedCategory, selectedArea, sortByHighestDiscount) {
         var result = offers.filter { offer ->
             val matchesSearch = searchQuery.isBlank() ||
                     offer.productName.contains(searchQuery, ignoreCase = true) ||
                     offer.businessName.contains(searchQuery, ignoreCase = true) ||
-                    offer.category.displayName.contains(searchQuery, ignoreCase = true) ||
+                    offer.category.contains(searchQuery, ignoreCase = true) ||
                     offer.couponCode.contains(searchQuery, ignoreCase = true)
 
-            val matchesCategory = selectedCategory == null || offer.category == selectedCategory
+            val matchesCategory = selectedCategory == null || offer.category.equals(selectedCategory, ignoreCase = true)
             val matchesArea = selectedArea == null || offer.area.equals(selectedArea, ignoreCase = true)
 
             matchesSearch && matchesCategory && matchesArea
@@ -115,13 +111,12 @@ fun OffersScreen(
 
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Search Input: "Customer types a product (e.g. iPhone 18 Pro)"
                     OutlinedTextField(
                         value = searchQuery,
                         onValueChange = { searchQuery = it },
                         placeholder = {
                             Text(
-                                text = "Search any product (e.g. iPhone 18 Pro, Kurti)...",
+                                text = "Search any product (e.g. iPhone, Kurti, Thali)...",
                                 fontSize = 13.sp,
                                 color = Color.Gray
                             )
@@ -154,147 +149,85 @@ fun OffersScreen(
             }
         }
 
-        // Quick Tag Suggestions
+        // Category Filter Chips
         item {
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 Text(
-                    text = "Popular Searches in Himmatnagar:",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.outline
+                    text = "Filter by Category:",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(modifier = Modifier.height(6.dp))
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(quickSearches) { tag ->
-                        val isSelected = searchQuery.equals(tag, ignoreCase = true)
-                        Card(
-                            modifier = Modifier.clickable {
-                                searchQuery = if (isSelected) "" else tag
-                            },
-                            shape = RoundedCornerShape(10.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isSelected) BrandPrimaryContainer else MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            Text(
-                                text = tag,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isSelected) BrandPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                            )
-                        }
+                Spacer(modifier = Modifier.height(4.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        FilterChip(
+                            selected = selectedCategory == null,
+                            onClick = { selectedCategory = null },
+                            label = { Text("All Categories") }
+                        )
+                    }
+                    items(BusinessCategories.ALL.filter { it != "Other" }) { cat ->
+                        FilterChip(
+                            selected = selectedCategory == cat,
+                            onClick = { selectedCategory = if (selectedCategory == cat) null else cat },
+                            label = { Text(cat) }
+                        )
                     }
                 }
-            }
-        }
-
-        // Sorting & Filter Row
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                // Highest discount vs Lowest price toggle
-                FilterChip(
-                    selected = sortByHighestDiscount,
-                    onClick = { sortByHighestDiscount = !sortByHighestDiscount },
-                    label = {
-                        Text(
-                            text = if (sortByHighestDiscount) "Sorted: Highest Discount First" else "Sorted: Lowest Price First",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = if (sortByHighestDiscount) Icons.Default.TrendingDown else Icons.Default.AttachMoney,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                )
-
-                Text(
-                    text = "${filteredOffers.size} offers",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.outline
-                )
             }
         }
 
         // Area Filter Chips
         item {
-            LazyRow(
-                modifier = Modifier.padding(vertical = 4.dp),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                item {
-                    FilterChip(
-                        selected = selectedArea == null,
-                        onClick = { selectedArea = null },
-                        label = { Text("All Areas") }
-                    )
-                }
-                items(HimmatnagarLocations.AREAS.take(6)) { area ->
-                    FilterChip(
-                        selected = selectedArea == area,
-                        onClick = {
-                            selectedArea = if (selectedArea == area) null else area
-                        },
-                        label = { Text(area) }
-                    )
-                }
-            }
-        }
-
-        // Offers Feed
-        if (filteredOffers.isEmpty()) {
-            item {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(48.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = Icons.Default.LocalOffer,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.outline,
-                            modifier = Modifier.size(48.dp)
+            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)) {
+                Text(
+                    text = "Filter by Locality:",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    item {
+                        FilterChip(
+                            selected = selectedArea == null,
+                            onClick = { selectedArea = null },
+                            label = { Text("All Areas") }
                         )
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Text(
-                            text = "No offers found for '$searchQuery'",
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Try searching for iPhone, Kurti, Thali, or clear filters",
-                            fontSize = 12.sp,
-                            color = MaterialTheme.colorScheme.outline
+                    }
+                    items(HimmatnagarLocations.AREAS) { area ->
+                        FilterChip(
+                            selected = selectedArea == area,
+                            onClick = { selectedArea = if (selectedArea == area) null else area },
+                            label = { Text(area) }
                         )
                     }
                 }
             }
-        } else {
-            items(filteredOffers, key = { it.id }) { offer ->
-                Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
-                    OfferCard(
-                        offer = offer,
-                        onShopClick = {
-                            val shop = businesses.find { it.id == offer.businessId }
-                            if (shop != null) onSelectBusiness(shop)
-                        }
-                    )
-                }
+        }
+
+        // Count
+        item {
+            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                Text(
+                    text = "${filteredOffers.size} active discount offers in Himmatnagar",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.outline
+                )
+            }
+        }
+
+        // Offers list
+        items(filteredOffers, key = { it.id }) { offer ->
+            Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                OfferCard(
+                    offer = offer,
+                    onShopClick = {
+                        val shop = businesses.find { it.id == offer.businessId }
+                        if (shop != null) onSelectBusiness(shop)
+                    }
+                )
             }
         }
     }

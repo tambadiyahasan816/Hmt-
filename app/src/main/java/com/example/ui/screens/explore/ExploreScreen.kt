@@ -3,7 +3,6 @@ package com.example.ui.screens.explore
 import androidx.compose.animation.*
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -25,16 +24,18 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.model.Business
-import com.example.data.model.BusinessCategory
 import com.example.data.model.HimmatnagarLocations
+import com.example.data.model.Offer
 import com.example.ui.components.BusinessCard
-import com.example.ui.components.CategoryIcon
+import com.example.ui.components.OfferCard
 import com.example.ui.components.launchGoogleMaps
 import com.example.ui.theme.*
 
+// FIX 5: Explore Screen with "Offers / Discount Finder" relocated to top section
 @Composable
 fun ExploreScreen(
     businesses: List<Business>,
+    offers: List<Offer>,
     followedIds: Set<String>,
     onFollowClick: (String) -> Unit,
     onSelectBusiness: (Business) -> Unit,
@@ -43,15 +44,24 @@ fun ExploreScreen(
 ) {
     val context = LocalContext.current
     var selectedArea by remember { mutableStateOf<String?>(null) }
-    var selectedCategory by remember { mutableStateOf<BusinessCategory?>(null) }
+    var offerSearchQuery by remember { mutableStateOf("") }
     var isMapView by remember { mutableStateOf(false) }
     var activePinnedShop by remember { mutableStateOf<Business?>(null) }
 
-    val filteredBusinesses = remember(businesses, selectedArea, selectedCategory) {
+    val filteredOffers = remember(offers, offerSearchQuery) {
+        if (offerSearchQuery.isBlank()) offers else {
+            offers.filter {
+                it.productName.contains(offerSearchQuery, ignoreCase = true) ||
+                        it.businessName.contains(offerSearchQuery, ignoreCase = true) ||
+                        it.category.contains(offerSearchQuery, ignoreCase = true) ||
+                        it.couponCode.contains(offerSearchQuery, ignoreCase = true)
+            }
+        }
+    }
+
+    val filteredBusinesses = remember(businesses, selectedArea) {
         businesses.filter { b ->
-            val matchArea = selectedArea == null || b.area.equals(selectedArea, ignoreCase = true)
-            val matchCat = selectedCategory == null || b.category == selectedCategory
-            matchArea && matchCat
+            selectedArea == null || b.area.equals(selectedArea, ignoreCase = true)
         }
     }
 
@@ -65,156 +75,68 @@ fun ExploreScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(BrandPrimary)
-                .padding(horizontal = 16.dp, vertical = 16.dp)
-        ) {
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column {
-                        Text(
-                            text = "Explore Himmatnagar",
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.ExtraBold,
-                            color = Color.White
-                        )
-                        Text(
-                            text = "Filter by locality, market area & map pins",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.8f)
-                        )
-                    }
-
-                    // View Mode Toggle (Map vs List)
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(Color.White.copy(alpha = 0.2f))
-                            .padding(2.dp)
-                    ) {
-                        IconButton(
-                            onClick = { isMapView = false },
-                            modifier = Modifier
-                                .size(34.dp)
-                                .background(
-                                    if (!isMapView) Color.White else Color.Transparent,
-                                    CircleShape
-                                )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.ViewList,
-                                contentDescription = "List",
-                                tint = if (!isMapView) BrandPrimary else Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { isMapView = true },
-                            modifier = Modifier
-                                .size(34.dp)
-                                .background(
-                                    if (isMapView) Color.White else Color.Transparent,
-                                    CircleShape
-                                )
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Map,
-                                contentDescription = "Map",
-                                tint = if (isMapView) BrandPrimary else Color.White,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // Area Filter Chips
-        Column(modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)) {
-            Text(
-                text = "Filter by Himmatnagar Locality:",
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp)
-            )
-
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                item {
-                    FilterChip(
-                        selected = selectedArea == null,
-                        onClick = { selectedArea = null },
-                        label = { Text("All Areas") }
-                    )
-                }
-                items(HimmatnagarLocations.AREAS) { area ->
-                    FilterChip(
-                        selected = selectedArea == area,
-                        onClick = {
-                            selectedArea = if (selectedArea == area) null else area
-                        },
-                        label = { Text(area) }
-                    )
-                }
-            }
-        }
-
-        // Worker Directory Quick Callout Banner
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp)
-                .clickable { onOpenWorkerDirectory() },
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
             Row(
-                modifier = Modifier.padding(12.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
+                Column {
+                    Text(
+                        text = "Explore & Deals",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "Himmatnagar Offers, Local Markets & Map",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color.White.copy(alpha = 0.85f)
+                    )
+                }
+
+                // View Mode Toggle (Map vs List)
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color.White.copy(alpha = 0.2f))
+                        .padding(2.dp)
+                ) {
+                    IconButton(
+                        onClick = { isMapView = false },
                         modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(BrandPrimary),
-                        contentAlignment = Alignment.Center
+                            .size(34.dp)
+                            .background(
+                                if (!isMapView) Color.White else Color.Transparent,
+                                CircleShape
+                            )
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Build,
-                            contentDescription = null,
-                            tint = Color.White,
+                            imageVector = Icons.Default.ViewList,
+                            contentDescription = "List",
+                            tint = if (!isMapView) BrandPrimary else Color.White,
                             modifier = Modifier.size(18.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = "Himmatnagar Worker Directory",
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                        Text(
-                            text = "Find local Plumbers, Electricians, Tutors & Mechanics",
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+
+                    IconButton(
+                        onClick = { isMapView = true },
+                        modifier = Modifier
+                            .size(34.dp)
+                            .background(
+                                if (isMapView) Color.White else Color.Transparent,
+                                CircleShape
+                            )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Map,
+                            contentDescription = "Map",
+                            tint = if (isMapView) BrandPrimary else Color.White,
+                            modifier = Modifier.size(18.dp)
                         )
                     }
                 }
-
-                Icon(
-                    imageVector = Icons.Default.ChevronRight,
-                    contentDescription = null,
-                    tint = BrandPrimary
-                )
             }
         }
 
@@ -225,7 +147,6 @@ fun ExploreScreen(
                     .fillMaxSize()
                     .padding(bottom = 72.dp)
             ) {
-                // Interactive Canvas Map Grid
                 Canvas(
                     modifier = Modifier
                         .fillMaxSize()
@@ -340,7 +261,7 @@ fun ExploreScreen(
                                 }
                             }
                             Text(
-                                text = "📍 ${shop.area}, Himmatnagar • ${shop.category.displayName}",
+                                text = "📍 ${shop.area}, Himmatnagar • ${shop.category}",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -370,23 +291,150 @@ fun ExploreScreen(
                 }
             }
         } else {
-            // List View
+            // List View with Offers Section at the Top
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(bottom = 72.dp),
                 contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // ================= TOP SECTION: OFFERS / DISCOUNT FINDER (FIX 5) =================
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.LocalOffer,
+                                        contentDescription = null,
+                                        tint = BrandSecondaryDark,
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Himmatnagar Deals & Offers",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = BrandSecondary.copy(alpha = 0.2f)
+                                ) {
+                                    Text(
+                                        text = "${filteredOffers.size} Active",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = BrandSecondaryDark,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            OutlinedTextField(
+                                value = offerSearchQuery,
+                                onValueChange = { offerSearchQuery = it },
+                                placeholder = { Text("Search deals (e.g. iPhone, Kurti, Thali, Sweets)...", fontSize = 12.sp) },
+                                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null, tint = BrandPrimary) },
+                                trailingIcon = {
+                                    if (offerSearchQuery.isNotEmpty()) {
+                                        IconButton(onClick = { offerSearchQuery = "" }) {
+                                            Icon(Icons.Default.Clear, contentDescription = "Clear", modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+                                },
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Spacer(modifier = Modifier.height(10.dp))
+
+                            // Horizontal Offers Preview
+                            if (filteredOffers.isEmpty()) {
+                                Text(
+                                    text = "No matching discount offers found in Himmatnagar.",
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.outline,
+                                    modifier = Modifier.padding(vertical = 8.dp)
+                                )
+                            } else {
+                                LazyRow(
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    items(filteredOffers, key = { it.id }) { offer ->
+                                        OfferCard(
+                                            offer = offer,
+                                            onShopClick = {
+                                                val shop = businesses.find { it.id == offer.businessId }
+                                                if (shop != null) onSelectBusiness(shop)
+                                            },
+                                            modifier = Modifier.width(280.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Locality Filter Chips (FIX 3 with full list)
+                item {
+                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                        Text(
+                            text = "Filter by Himmatnagar Locality:",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            item {
+                                FilterChip(
+                                    selected = selectedArea == null,
+                                    onClick = { selectedArea = null },
+                                    label = { Text("All Areas") }
+                                )
+                            }
+                            items(HimmatnagarLocations.AREAS) { area ->
+                                FilterChip(
+                                    selected = selectedArea == area,
+                                    onClick = {
+                                        selectedArea = if (selectedArea == area) null else area
+                                    },
+                                    label = { Text(area) }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Section header
                 item {
                     Text(
-                        text = "Businesses in ${selectedArea ?: "All Himmatnagar"} (${filteredBusinesses.size})",
+                        text = "Businesses in ${selectedArea ?: "Himmatnagar"} (${filteredBusinesses.size})",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.outline
                     )
                 }
 
+                // Businesses list
                 items(filteredBusinesses, key = { it.id }) { business ->
                     BusinessCard(
                         business = business,
