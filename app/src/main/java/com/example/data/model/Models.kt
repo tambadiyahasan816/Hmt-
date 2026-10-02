@@ -193,7 +193,18 @@ data class Offer(
     val couponCode: String,
     val validUntil: String,
     val imageUrl: String = ""
-)
+) {
+    fun isExpired(currentTime: Long = System.currentTimeMillis()): Boolean {
+        return try {
+            val fmt = java.text.SimpleDateFormat("dd MMM yyyy", java.util.Locale.ENGLISH)
+            fmt.isLenient = false
+            val end = fmt.parse(validUntil.trim())?.time?.plus(TimeUnit.DAYS.toMillis(1)) ?: return false
+            currentTime >= end
+        } catch (e: Exception) {
+            false
+        }
+    }
+}
 
 data class Worker(
     val id: String,
@@ -219,5 +230,6 @@ data class ChatMessage(
     val senderName: String,
     val text: String,
     val timestamp: Long = System.currentTimeMillis(),
-    val isFromOwner: Boolean = false
+    val isFromOwner: Boolean = false,
+    val customerId: String = ""
 )

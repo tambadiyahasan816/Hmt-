@@ -78,7 +78,10 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
                 onSelectCustomer = { viewModel.navigateTo(ScreenState.CUSTOMER_AUTH) },
                 onSelectOwner = { viewModel.navigateTo(ScreenState.OWNER_AUTH) },
                 onSelectWorker = { viewModel.navigateTo(ScreenState.WORKER_AUTH) },
-                onContinueAsGuest = { viewModel.continueAsGuest() }
+                onContinueAsGuest = { viewModel.continueAsGuest() },
+                onGoogleSignIn = { name, phone ->
+                    viewModel.registerCustomer(name, phone)
+                }
             )
         }
 

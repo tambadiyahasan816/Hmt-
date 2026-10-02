@@ -1,6 +1,7 @@
 package com.example.ui.screens.profile
 
 import android.widget.Toast
+import com.example.BuildConfig
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -71,20 +72,19 @@ fun ProfileDashboardScreen(
 
     // Find the owner's business
     val ownerBusiness = if (isOwner) {
-        businesses.find { it.ownerId == currentUser?.id } ?: businesses.firstOrNull()
+        businesses.find { it.ownerId == currentUser?.id }
     } else null
 
     // Find worker profile if worker
     val workerProfile = if (isWorker) {
         workers.find { it.profileId == currentUser?.id || it.phone == currentUser?.phone }
-            ?: workers.firstOrNull()
             ?: Worker(
                 id = currentUser?.id ?: "w_default",
                 profileId = currentUser?.id ?: "w_default",
                 name = currentUser?.name ?: "Worker",
                 serviceType = "Technician",
-                phone = currentUser?.phone ?: "+91 98250 11223",
-                whatsapp = currentUser?.phone ?: "+91 98250 11223",
+                phone = currentUser?.phone ?: "",
+                whatsapp = currentUser?.phone ?: "",
                 area = "Himmatnagar",
                 experienceYears = "Experienced"
             )
@@ -675,63 +675,65 @@ fun ProfileDashboardScreen(
         // ================= ROLE SWITCHER & SETTINGS =================
         item {
             Column(modifier = Modifier.padding(16.dp)) {
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider()
-                Spacer(modifier = Modifier.height(16.dp))
+                if (BuildConfig.DEBUG) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider()
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                Text(
-                    text = "Account & Role Testing Switcher:",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "Instantly switch views to preview the Customer, Business Owner or Worker experience.",
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.outline
-                )
+                    Text(
+                        text = "Account & Role Testing Switcher:",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Instantly switch views to preview the Customer, Business Owner or Worker experience.",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.outline
+                    )
 
-                Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(10.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    OutlinedButton(
-                        onClick = { onSwitchRole(UserRole.CUSTOMER) },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 4.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text("Customer", fontSize = 11.sp)
+                        OutlinedButton(
+                            onClick = { onSwitchRole(UserRole.CUSTOMER) },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 4.dp)
+                        ) {
+                            Text("Customer", fontSize = 11.sp)
+                        }
+
+                        Button(
+                            onClick = { onSwitchRole(UserRole.OWNER) },
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandSecondary, contentColor = Color.Black),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 4.dp)
+                        ) {
+                            Text("Owner", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = { onSwitchRole(UserRole.WORKER) },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF97316), contentColor = Color.White),
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 4.dp)
+                        ) {
+                            Text("Worker", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = { onSwitchRole(UserRole.ADMIN) },
+                            modifier = Modifier.weight(1f),
+                            contentPadding = PaddingValues(horizontal = 4.dp)
+                        ) {
+                            Text("Admin", fontSize = 11.sp)
+                        }
                     }
 
-                    Button(
-                        onClick = { onSwitchRole(UserRole.OWNER) },
-                        colors = ButtonDefaults.buttonColors(containerColor = BrandSecondary, contentColor = Color.Black),
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 4.dp)
-                    ) {
-                        Text("Owner", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    Button(
-                        onClick = { onSwitchRole(UserRole.WORKER) },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF97316), contentColor = Color.White),
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 4.dp)
-                    ) {
-                        Text("Worker", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    OutlinedButton(
-                        onClick = { onSwitchRole(UserRole.ADMIN) },
-                        modifier = Modifier.weight(1f),
-                        contentPadding = PaddingValues(horizontal = 4.dp)
-                    ) {
-                        Text("Admin", fontSize = 11.sp)
-                    }
+                    Spacer(modifier = Modifier.height(14.dp))
                 }
-
-                Spacer(modifier = Modifier.height(14.dp))
 
                 OutlinedButton(
                     onClick = onLogout,
@@ -829,6 +831,7 @@ fun CreateOfferDialog(
     onDismiss: () -> Unit,
     onCreate: (productName: String, category: String, original: Double, discounted: Double, code: String, valid: String) -> Unit
 ) {
+    val offerContext = LocalContext.current
     var productName by remember { mutableStateOf("") }
     var originalPrice by remember { mutableStateOf("") }
     var discountedPrice by remember { mutableStateOf("") }
@@ -883,8 +886,12 @@ fun CreateOfferDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    val orig = originalPrice.toDoubleOrNull() ?: 100.0
-                    val disc = discountedPrice.toDoubleOrNull() ?: 80.0
+                    val orig = originalPrice.toDoubleOrNull()
+                    val disc = discountedPrice.toDoubleOrNull()
+                    if (orig == null || orig <= 0 || disc == null || disc <= 0 || disc >= orig) {
+                        Toast.makeText(offerContext, "Enter valid prices (discount must be less than original)", Toast.LENGTH_SHORT).show()
+                        return@Button
+                    }
                     val code = if (couponCode.isNotBlank()) couponCode else "SAVE10"
                     if (productName.isNotBlank()) {
                         onCreate(productName, category, orig, disc, code, validUntil)

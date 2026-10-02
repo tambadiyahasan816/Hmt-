@@ -331,7 +331,7 @@ fun AddWorkerDialog(
 
                 OutlinedTextField(
                     value = phone,
-                    onValueChange = { if (it.length <= 10) phone = it },
+                    onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) phone = it },
                     label = { Text("Contact Phone") },
                     prefix = { Text("+91 ") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),

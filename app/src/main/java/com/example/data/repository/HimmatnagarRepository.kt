@@ -684,20 +684,22 @@ class HimmatnagarRepository {
 
     // Chat Actions
     fun sendChatMessage(businessId: String, businessName: String, text: String, isFromOwner: Boolean) {
-        val user = _currentUser.value
-        val senderId = user?.id ?: "guest"
-        val senderName = user?.name ?: if (isFromOwner) businessName else "Customer"
+        val user = _currentUser.value ?: return
+        val customerId = if (isFromOwner) {
+            _chatMessages.value.lastOrNull { it.businessId == businessId && !it.isFromOwner }?.customerId ?: return
+        } else user.id
 
         val newMsg = ChatMessage(
             id = "msg_${UUID.randomUUID().toString().take(8)}",
-            chatId = "chat_$businessId",
+            chatId = "chat_${businessId}_$customerId",
             businessId = businessId,
             businessName = businessName,
-            senderId = senderId,
-            senderName = senderName,
+            senderId = user.id,
+            senderName = user.name,
             text = text,
             timestamp = System.currentTimeMillis(),
-            isFromOwner = isFromOwner
+            isFromOwner = isFromOwner,
+            customerId = customerId
         )
         _chatMessages.value = _chatMessages.value + newMsg
     }

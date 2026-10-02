@@ -49,8 +49,8 @@ fun ChatScreen(
         "Can I get a discount with coupon code?"
     )
 
-    val chatMessages = remember(messages, business.id) {
-        messages.filter { it.businessId == business.id }
+    val chatMessages = remember(messages, business.id, currentUser?.id) {
+        messages.filter { it.businessId == business.id && (isOwner || it.customerId == currentUser?.id) }
     }
 
     val listState = rememberLazyListState()

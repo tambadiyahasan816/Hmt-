@@ -28,10 +28,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.auth.GoogleAuthHelper
 import com.example.data.model.BusinessCategories
 import com.example.data.model.HimmatnagarLocations
 import com.example.data.model.WorkerServiceTypes
 import com.example.ui.theme.*
+import kotlinx.coroutines.launch
 
 // FIX 2: Role selection screen with 3 options: Business Owner, Worker, Customer
 @Composable
@@ -39,7 +41,8 @@ fun RoleSelectionScreen(
     onSelectCustomer: () -> Unit,
     onSelectOwner: () -> Unit,
     onSelectWorker: () -> Unit,
-    onContinueAsGuest: () -> Unit
+    onContinueAsGuest: () -> Unit,
+    onGoogleSignIn: ((name: String, phone: String) -> Unit)? = null
 ) {
     Box(
         modifier = Modifier
@@ -305,7 +308,72 @@ fun RoleSelectionScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+
+            var isGoogleSigningIn by remember { mutableStateOf(false) }
+            val coroutineScope = rememberCoroutineScope()
+            val context = LocalContext.current
+            val authHelper = remember { GoogleAuthHelper(context) }
+
+            OutlinedButton(
+                onClick = {
+                    if (!isGoogleSigningIn) {
+                        isGoogleSigningIn = true
+                        coroutineScope.launch {
+                            try {
+                                val user = authHelper.signInWithGoogle()
+                                if (user != null) {
+                                    val name = user.displayName ?: "Google User"
+                                    val phone = user.phoneNumber ?: user.email ?: "+91 98250 00000"
+                                    Toast.makeText(context, "Welcome, $name!", Toast.LENGTH_SHORT).show()
+                                    if (onGoogleSignIn != null) {
+                                        onGoogleSignIn(name, phone)
+                                    } else {
+                                        onSelectCustomer()
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Toast.makeText(
+                                    context,
+                                    e.localizedMessage ?: "Google Sign-In failed",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            } finally {
+                                isGoogleSigningIn = false
+                            }
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = Color.White
+                ),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.45f)),
+                enabled = !isGoogleSigningIn
+            ) {
+                if (isGoogleSigningIn) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(20.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Signing in with Google...", color = Color.White)
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = "Google",
+                        tint = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text("Quick Sign In with Google", color = Color.White, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
 
             TextButton(
                 onClick = onContinueAsGuest,
@@ -386,7 +454,7 @@ fun CustomerAuthScreen(
 
                 OutlinedTextField(
                     value = phoneNumber,
-                    onValueChange = { if (it.length <= 10) phoneNumber = it },
+                    onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) phoneNumber = it },
                     label = { Text("Mobile Phone Number") },
                     prefix = { Text("+91 ") },
                     leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
@@ -413,6 +481,77 @@ fun CustomerAuthScreen(
                     shape = RoundedCornerShape(12.dp)
                 ) {
                     Text("Get Verification OTP", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HorizontalDivider(modifier = Modifier.weight(1f))
+                    Text(
+                        text = "  OR  ",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                    HorizontalDivider(modifier = Modifier.weight(1f))
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                var isGoogleSigningIn by remember { mutableStateOf(false) }
+                val coroutineScope = rememberCoroutineScope()
+                val authHelper = remember { GoogleAuthHelper(context) }
+
+                OutlinedButton(
+                    onClick = {
+                        if (!isGoogleSigningIn) {
+                            isGoogleSigningIn = true
+                            coroutineScope.launch {
+                                try {
+                                    val user = authHelper.signInWithGoogle()
+                                    if (user != null) {
+                                        val name = user.displayName ?: "Google User"
+                                        val phone = user.phoneNumber ?: user.email ?: "+91 98250 00000"
+                                        Toast.makeText(context, "Welcome, $name!", Toast.LENGTH_SHORT).show()
+                                        onSuccess(name, phone)
+                                    }
+                                } catch (e: Exception) {
+                                    Toast.makeText(
+                                        context,
+                                        e.localizedMessage ?: "Google Sign-In failed",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                } finally {
+                                    isGoogleSigningIn = false
+                                }
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(50.dp),
+                    shape = RoundedCornerShape(12.dp),
+                    enabled = !isGoogleSigningIn
+                ) {
+                    if (isGoogleSigningIn) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("Signing in with Google...")
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.AccountCircle,
+                            contentDescription = "Google",
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text("Continue with Google", fontWeight = FontWeight.SemiBold)
+                    }
                 }
             } else {
                 Card(
@@ -549,7 +688,7 @@ fun WorkerAuthScreen(
 
                 OutlinedTextField(
                     value = phone,
-                    onValueChange = { if (it.length <= 10) phone = it },
+                    onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) phone = it },
                     label = { Text("Mobile Phone Number (Calls & WhatsApp)") },
                     prefix = { Text("+91 ") },
                     leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
@@ -874,7 +1013,7 @@ fun BusinessOwnerAuthScreen(
 
                 OutlinedTextField(
                     value = phone,
-                    onValueChange = { if (it.length <= 10) phone = it },
+                    onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) phone = it },
                     label = { Text("Calling Phone Number") },
                     prefix = { Text("+91 ") },
                     leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) },
@@ -887,7 +1026,7 @@ fun BusinessOwnerAuthScreen(
 
                 OutlinedTextField(
                     value = whatsapp,
-                    onValueChange = { if (it.length <= 10) whatsapp = it },
+                    onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) whatsapp = it },
                     label = { Text("WhatsApp Business Number") },
                     prefix = { Text("+91 ") },
                     leadingIcon = { Icon(Icons.Default.Send, contentDescription = null, tint = WhatsAppGreen) },

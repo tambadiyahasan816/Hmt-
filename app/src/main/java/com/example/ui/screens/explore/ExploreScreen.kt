@@ -48,9 +48,13 @@ fun ExploreScreen(
     var isMapView by remember { mutableStateOf(false) }
     var activePinnedShop by remember { mutableStateOf<Business?>(null) }
 
-    val filteredOffers = remember(offers, offerSearchQuery) {
-        if (offerSearchQuery.isBlank()) offers else {
-            offers.filter {
+    val activeOffers = remember(offers) {
+        offers.filter { !it.isExpired() }
+    }
+
+    val filteredOffers = remember(activeOffers, offerSearchQuery) {
+        if (offerSearchQuery.isBlank()) activeOffers else {
+            activeOffers.filter {
                 it.productName.contains(offerSearchQuery, ignoreCase = true) ||
                         it.businessName.contains(offerSearchQuery, ignoreCase = true) ||
                         it.category.contains(offerSearchQuery, ignoreCase = true) ||

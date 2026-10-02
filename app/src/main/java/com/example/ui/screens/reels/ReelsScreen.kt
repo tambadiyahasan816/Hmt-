@@ -370,7 +370,7 @@ fun ReelsScreen(
 
         // Business Owner ONLY: Upload Reel FAB
         // "Customers can NEVER post videos or create business listings."
-        val isBusinessOwner = currentUser?.role == UserRole.OWNER || currentUser?.role == UserRole.ADMIN
+        val isBusinessOwner = currentUser?.role == UserRole.OWNER
         if (isBusinessOwner) {
             FloatingActionButton(
                 onClick = { showUploadDialog = true },

@@ -73,7 +73,7 @@ class MainViewModel(
     }
 
     fun openChatByBusinessId(businessId: String) {
-        val b = businesses.value.find { it.id == businessId } ?: businesses.value.firstOrNull()
+        val b = businesses.value.find { it.id == businessId }
         if (b != null) {
             openChat(b)
         }
@@ -168,6 +168,11 @@ class MainViewModel(
     }
 
     fun logout() {
+        try {
+            com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
+        } catch (e: Exception) {
+            // ignore
+        }
         repository.setCurrentUser(null)
         _currentScreen.value = ScreenState.ROLE_SELECTION
     }
@@ -183,7 +188,9 @@ class MainViewModel(
 
     // Owner actions
     fun uploadReel(title: String, caption: String) {
-        val businessId = _selectedBusiness.value?.id ?: businesses.value.firstOrNull()?.id ?: "b1"
+        val user = currentUser.value ?: return
+        if (user.role != UserRole.OWNER) return
+        val businessId = businesses.value.find { it.ownerId == user.id }?.id ?: return
         repository.addReel(businessId, title, caption)
     }
 
