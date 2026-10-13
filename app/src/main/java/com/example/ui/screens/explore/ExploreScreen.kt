@@ -439,13 +439,35 @@ fun ExploreScreen(
                 }
 
                 // Businesses list
-                items(filteredBusinesses, key = { it.id }) { business ->
-                    BusinessCard(
-                        business = business,
-                        isFollowed = followedIds.contains(business.id),
-                        onFollowClick = { onFollowClick(business.id) },
-                        onClick = { onSelectBusiness(business) }
-                    )
+                if (filteredBusinesses.isEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 12.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Icon(Icons.Default.Storefront, contentDescription = null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(36.dp))
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("No businesses found in ${selectedArea ?: "this locality"}", fontWeight = FontWeight.Bold)
+                                Text("Try selecting 'All Areas' to browse all verified shops in Himmatnagar.", fontSize = 12.sp, color = MaterialTheme.colorScheme.outline)
+                            }
+                        }
+                    }
+                } else {
+                    items(filteredBusinesses, key = { it.id }) { business ->
+                        BusinessCard(
+                            business = business,
+                            isFollowed = followedIds.contains(business.id),
+                            onFollowClick = { onFollowClick(business.id) },
+                            onClick = { onSelectBusiness(business) }
+                        )
+                    }
                 }
             }
         }

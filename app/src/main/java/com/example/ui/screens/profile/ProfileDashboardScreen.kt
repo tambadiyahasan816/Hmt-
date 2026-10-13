@@ -54,7 +54,8 @@ fun ProfileDashboardScreen(
     onUploadReel: (title: String, caption: String) -> Unit,
     onUpdateBusiness: (businessId: String, bio: String, phone: String, whatsapp: String, address: String) -> Unit,
     onUpdateWorker: (workerId: String, name: String, serviceType: String, phone: String, area: String, exp: String) -> Unit = { _, _, _, _, _, _ -> },
-    onSwitchRole: (UserRole) -> Unit,
+    onUpdatePhone: ((String) -> Unit)? = null,
+    remainingQuota: Int = 3,
     onOpenAdminPanel: () -> Unit,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier
@@ -64,34 +65,46 @@ fun ProfileDashboardScreen(
     var showEditProfileDialog by remember { mutableStateOf(false) }
     var showUploadReelDialog by remember { mutableStateOf(false) }
     var showEditWorkerDialog by remember { mutableStateOf(false) }
+    var showUpdatePhoneDialog by remember { mutableStateOf(false) }
 
     val userRole = currentUser?.role ?: UserRole.CUSTOMER
     val isOwner = userRole == UserRole.OWNER
     val isWorker = userRole == UserRole.WORKER
     val isAdmin = userRole == UserRole.ADMIN
 
-    // Find the owner's business
+    // Find the owner's business securely
     val ownerBusiness = if (isOwner) {
-        businesses.find { it.ownerId == currentUser?.id }
+        businesses.find { it.ownerId == currentUser?.id || it.ownerId == currentUser?.firebaseUid }
     } else null
 
-    // Find worker profile if worker
+    // Find worker profile securely
     val workerProfile = if (isWorker) {
-        workers.find { it.profileId == currentUser?.id || it.phone == currentUser?.phone }
-            ?: Worker(
-                id = currentUser?.id ?: "w_default",
-                profileId = currentUser?.id ?: "w_default",
-                name = currentUser?.name ?: "Worker",
-                serviceType = "Technician",
-                phone = currentUser?.phone ?: "",
-                whatsapp = currentUser?.phone ?: "",
-                area = "Himmatnagar",
-                experienceYears = "Experienced"
-            )
+        workers.find {
+            it.profileId == currentUser?.id ||
+            it.profileId == currentUser?.firebaseUid ||
+            it.id == currentUser?.id ||
+            it.id == currentUser?.firebaseUid ||
+            (it.phone.isNotBlank() && it.phone == currentUser?.phone)
+        } ?: Worker(
+            id = currentUser?.id ?: "w_default",
+            profileId = currentUser?.firebaseUid ?: currentUser?.id ?: "w_default",
+            name = currentUser?.name ?: "Worker",
+            serviceType = "Technician",
+            phone = currentUser?.phone ?: "",
+            whatsapp = currentUser?.phone ?: "",
+            area = "Himmatnagar",
+            experienceYears = "Experienced"
+        )
     } else null
 
+    // Filter strictly active reels (hide expired immediately)
     val ownerReels = remember(reels, ownerBusiness) {
-        if (ownerBusiness != null) reels.filter { it.businessId == ownerBusiness.id } else emptyList()
+        if (ownerBusiness != null) reels.filter { it.businessId == ownerBusiness.id && !it.isExpired() } else emptyList()
+    }
+
+    val workerReels = remember(reels, workerProfile, currentUser) {
+        val uId = currentUser?.firebaseUid?.ifBlank { currentUser?.id } ?: ""
+        reels.filter { (it.workerId == workerProfile?.id || (uId.isNotBlank() && it.uploaderId == uId)) && !it.isExpired() }
     }
 
     val ownerOffers = remember(offers, ownerBusiness) {
@@ -155,10 +168,22 @@ fun ProfileDashboardScreen(
                         )
 
                         Text(
-                            text = currentUser?.phone ?: "Guest Mode",
+                            text = currentUser?.phone?.ifBlank { "No phone set" } ?: "Guest Mode",
                             fontSize = 12.sp,
                             color = Color.White.copy(alpha = 0.8f)
                         )
+
+                        if (currentUser != null) {
+                            Text(
+                                text = "Update mobile number ✎",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = BrandSecondary,
+                                modifier = Modifier
+                                    .padding(vertical = 2.dp)
+                                    .clickable { showUpdatePhoneDialog = true }
+                            )
+                        }
 
                         Spacer(modifier = Modifier.height(4.dp))
 
@@ -322,6 +347,12 @@ fun ProfileDashboardScreen(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
+                    Text(
+                        text = if (remainingQuota > 0) "Monthly Quota: $remainingQuota of 3 reels remaining" else "Monthly reel limit reached (3/3 uploaded)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (remainingQuota > 0) BrandPrimary else DangerRed
+                    )
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Row(
@@ -336,7 +367,7 @@ fun ProfileDashboardScreen(
                         ) {
                             Icon(Icons.Default.VideoCameraBack, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text("Post a Reel", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text("Post Reel (${remainingQuota}/3)", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         }
 
                         Button(
@@ -557,17 +588,79 @@ fun ProfileDashboardScreen(
                 }
             }
 
-            // Edit Profile Button
+            // Edit Profile & Post Reel Buttons
             item {
-                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    Button(
-                        onClick = { showEditWorkerDialog = true },
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        shape = RoundedCornerShape(12.dp)
+                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text("Edit Profile", fontWeight = FontWeight.Bold)
+                        Button(
+                            onClick = { showEditWorkerDialog = true },
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Edit Profile", fontWeight = FontWeight.Bold)
+                        }
+
+                        Button(
+                            onClick = { showUploadReelDialog = true },
+                            modifier = Modifier.weight(1f).height(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = BrandSecondary, contentColor = Color.Black)
+                        ) {
+                            Icon(Icons.Default.VideoCall, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Post Reel (${remainingQuota}/3)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            // Worker Active Reels Section
+            if (workerReels.isNotEmpty()) {
+                item {
+                    Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 4.dp)) {
+                        Text(
+                            text = "Your Active Reels (${workerReels.size})",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Auto-deletes strictly 10 days after upload",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                }
+
+                items(workerReels, key = { it.id }) { reel ->
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(text = reel.title, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text(
+                                    text = "Expires in ${reel.getRemainingTimeText()} • ${reel.views} views",
+                                    fontSize = 11.sp,
+                                    color = BrandSecondaryDark,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                            IconButton(onClick = { onDeleteReel(reel.id) }) {
+                                Icon(Icons.Default.Delete, contentDescription = "Delete Reel", tint = DangerRed)
+                            }
+                        }
                     }
                 }
             }
@@ -672,76 +765,16 @@ fun ProfileDashboardScreen(
             }
         }
 
-        // ================= ROLE SWITCHER & SETTINGS =================
+        // ================= SETTINGS & LOGOUT =================
         item {
             Column(modifier = Modifier.padding(16.dp)) {
-                if (BuildConfig.DEBUG) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    HorizontalDivider()
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    Text(
-                        text = "Account & Role Testing Switcher:",
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Instantly switch views to preview the Customer, Business Owner or Worker experience.",
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.outline
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = { onSwitchRole(UserRole.CUSTOMER) },
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 4.dp)
-                        ) {
-                            Text("Customer", fontSize = 11.sp)
-                        }
-
-                        Button(
-                            onClick = { onSwitchRole(UserRole.OWNER) },
-                            colors = ButtonDefaults.buttonColors(containerColor = BrandSecondary, contentColor = Color.Black),
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 4.dp)
-                        ) {
-                            Text("Owner", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        Button(
-                            onClick = { onSwitchRole(UserRole.WORKER) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF97316), contentColor = Color.White),
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 4.dp)
-                        ) {
-                            Text("Worker", fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-
-                        OutlinedButton(
-                            onClick = { onSwitchRole(UserRole.ADMIN) },
-                            modifier = Modifier.weight(1f),
-                            contentPadding = PaddingValues(horizontal = 4.dp)
-                        ) {
-                            Text("Admin", fontSize = 11.sp)
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-                }
-
                 OutlinedButton(
                     onClick = onLogout,
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.ExitToApp, contentDescription = null)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("Switch Role / Logout")
+                    Text("Logout")
                 }
             }
         }
@@ -776,6 +809,7 @@ fun ProfileDashboardScreen(
     // Dialog: Post Reel
     if (showUploadReelDialog) {
         com.example.ui.screens.reels.UploadReelDialog(
+            remainingQuota = remainingQuota,
             onDismiss = { showUploadReelDialog = false },
             onConfirm = { t, c ->
                 onUploadReel(t, c)
@@ -794,6 +828,49 @@ fun ProfileDashboardScreen(
                 onUpdateWorker(workerProfile.id, name, sType, phone, area, exp)
                 showEditWorkerDialog = false
                 Toast.makeText(context, "Worker profile updated!", Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    // Dialog: Update Mobile Number
+    if (showUpdatePhoneDialog && currentUser != null) {
+        var newPhoneInput by remember { mutableStateOf(currentUser.phone.replace("+91", "").trim()) }
+        AlertDialog(
+            onDismissRequest = { showUpdatePhoneDialog = false },
+            title = { Text("Update Mobile Number", fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Enter your new 10-digit mobile number:", fontSize = 13.sp)
+                    OutlinedTextField(
+                        value = newPhoneInput,
+                        onValueChange = { if (it.length <= 10 && it.all { c -> c.isDigit() }) newPhoneInput = it },
+                        label = { Text("Mobile Number") },
+                        prefix = { Text("+91 ") },
+                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Phone),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newPhoneInput.length == 10) {
+                            onUpdatePhone?.invoke("+91 $newPhoneInput")
+                            showUpdatePhoneDialog = false
+                            Toast.makeText(context, "Mobile number updated to +91 $newPhoneInput", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "Please enter 10 digits", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                ) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUpdatePhoneDialog = false }) {
+                    Text("Cancel")
+                }
             }
         )
     }

@@ -2,7 +2,7 @@ package com.example.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Sheher Himmatnagar Brand Colors
+// HMT Brand Colors
 val BrandPrimary = Color(0xFF1E3A8A)       // Deep Royal Blue
 val BrandPrimaryLight = Color(0xFF3B82F6)  // Vibrant Accent Blue
 val BrandPrimaryContainer = Color(0xFFDBEAFE) // Light Accent Blue

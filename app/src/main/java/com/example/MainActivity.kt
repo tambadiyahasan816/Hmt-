@@ -1,5 +1,6 @@
 package com.example
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -14,45 +15,67 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.model.UserRole
+import com.example.data.repository.HimmatnagarRepository
 import com.example.ui.screens.admin.AdminPanelScreen
 import com.example.ui.screens.auth.BusinessOwnerAuthScreen
 import com.example.ui.screens.auth.CustomerAuthScreen
 import com.example.ui.screens.auth.RoleSelectionScreen
 import com.example.ui.screens.auth.WorkerAuthScreen
 import com.example.ui.screens.chat.ChatScreen
-import com.example.ui.screens.explore.ExploreScreen
 import com.example.ui.screens.home.HomeScreen
+import com.example.ui.screens.offers.OffersScreen
 import com.example.ui.screens.profile.BusinessProfileScreen
 import com.example.ui.screens.profile.ProfileDashboardScreen
+import com.example.ui.screens.reels.ReelDetailScreen
 import com.example.ui.screens.reels.ReelsScreen
 import com.example.ui.screens.workers.WorkerDirectoryScreen
 import com.example.ui.theme.*
 
 class MainActivity : ComponentActivity() {
-
-    private val viewModel: MainViewModel by viewModels()
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        HimmatnagarRepository.init(applicationContext)
         enableEdgeToEdge()
+        val viewModel: MainViewModel by viewModels()
+        handleReelDeepLink(intent, viewModel)
         setContent {
             MyApplicationTheme {
-                SheherHimmatnagarApp(viewModel = viewModel)
+                HMTApp(viewModel = viewModel)
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        val viewModel: MainViewModel by viewModels()
+        handleReelDeepLink(intent, viewModel)
+    }
+
+    private fun handleReelDeepLink(intent: Intent?, viewModel: MainViewModel) {
+        val data = intent?.data
+        val reelId = data?.getQueryParameter("id") ?: intent?.getStringExtra("reel_id")
+        if (!reelId.isNullOrBlank()) {
+            viewModel.openReelDetail(reelId)
         }
     }
 }
 
 @Composable
-fun SheherHimmatnagarApp(viewModel: MainViewModel) {
+fun HMTApp(viewModel: MainViewModel) {
+    val context = LocalContext.current
     val currentScreen by viewModel.currentScreen.collectAsStateWithLifecycle()
     val selectedTab by viewModel.selectedTab.collectAsStateWithLifecycle()
     val currentUser by viewModel.currentUser.collectAsStateWithLifecycle()
@@ -64,23 +87,81 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
     val likedReelIds by viewModel.likedReelIds.collectAsStateWithLifecycle()
     val businessViews by viewModel.businessViews.collectAsStateWithLifecycle()
     val selectedBusiness by viewModel.selectedBusiness.collectAsStateWithLifecycle()
+    val selectedReel by viewModel.selectedReel.collectAsStateWithLifecycle()
     val chatBusiness by viewModel.chatBusiness.collectAsStateWithLifecycle()
     val chatMessages by viewModel.chatMessages.collectAsStateWithLifecycle()
+    val isOffline by viewModel.isOffline.collectAsStateWithLifecycle()
+    val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     // Handle back button on sub-screens
     BackHandler(enabled = currentScreen != ScreenState.ROLE_SELECTION) {
+        focusManager.clearFocus()
+        keyboardController?.hide()
         viewModel.handleBack()
     }
 
-    when (currentScreen) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding()
+    ) {
+        if (isOffline) {
+            Surface(
+                color = Color(0xFFF59E0B),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.CloudOff, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Offline Mode: Showing saved data", color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { viewModel.retryConnection() }) {
+                        Text("Retry", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+        errorMessage?.let { error ->
+            Surface(
+                color = Color(0xFFEF4444),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(error, color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    IconButton(onClick = { viewModel.clearError() }, modifier = Modifier.size(20.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = Color.White, modifier = Modifier.size(14.dp))
+                    }
+                }
+            }
+        }
+
+        Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            when (currentScreen) {
         ScreenState.ROLE_SELECTION -> {
             RoleSelectionScreen(
                 onSelectCustomer = { viewModel.navigateTo(ScreenState.CUSTOMER_AUTH) },
                 onSelectOwner = { viewModel.navigateTo(ScreenState.OWNER_AUTH) },
                 onSelectWorker = { viewModel.navigateTo(ScreenState.WORKER_AUTH) },
                 onContinueAsGuest = { viewModel.continueAsGuest() },
-                onGoogleSignIn = { name, phone ->
-                    viewModel.registerCustomer(name, phone)
+                onGoogleSignInSuccess = { uid, gName, gEmail ->
+                    val loggedIn = viewModel.loginExistingUserWithGoogle(uid, gEmail, gName)
+                    if (loggedIn) {
+                        android.widget.Toast.makeText(context, "Welcome back, $gName!", android.widget.Toast.LENGTH_SHORT).show()
+                    } else {
+                        android.widget.Toast.makeText(
+                            context,
+                            "No existing account found. Please register as a Business Owner, Worker, or Customer above.",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
             )
         }
@@ -88,8 +169,26 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
         ScreenState.CUSTOMER_AUTH -> {
             CustomerAuthScreen(
                 onBack = { viewModel.handleBack() },
-                onSuccess = { name, phone ->
-                    viewModel.registerCustomer(name, phone)
+                onSuccess = { uid, gName, gEmail, phone, name, idToken, avatarUrl ->
+                    try {
+                        viewModel.registerCustomerWithGoogle(
+                            firebaseUid = uid,
+                            googleName = gName,
+                            googleEmail = gEmail,
+                            enteredPhone = phone,
+                            enteredName = name,
+                            firebaseIdToken = idToken,
+                            avatarUrl = avatarUrl,
+                            onComplete = { res ->
+                                if (res.isFailure) {
+                                    val err = res.exceptionOrNull()?.localizedMessage ?: "Failed to sync profile"
+                                    android.widget.Toast.makeText(context, err, android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        )
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(context, e.localizedMessage ?: "Authentication failed", android.widget.Toast.LENGTH_LONG).show()
+                    }
                 }
             )
         }
@@ -97,8 +196,31 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
         ScreenState.OWNER_AUTH -> {
             BusinessOwnerAuthScreen(
                 onBack = { viewModel.handleBack() },
-                onSuccess = { shopName, ownerName, phone, cat, area, addr, wa ->
-                    viewModel.registerOwner(shopName, ownerName, phone, cat, area, addr, wa)
+                onSuccess = { uid, gName, gEmail, ownerName, phone, shopName, cat, area, addr, wa, idToken, avatarUrl ->
+                    try {
+                        viewModel.registerOwnerWithGoogle(
+                            firebaseUid = uid,
+                            googleName = gName,
+                            googleEmail = gEmail,
+                            enteredOwnerName = ownerName,
+                            enteredPhone = phone,
+                            shopName = shopName,
+                            category = cat,
+                            area = area,
+                            address = addr,
+                            whatsapp = wa,
+                            firebaseIdToken = idToken,
+                            avatarUrl = avatarUrl,
+                            onComplete = { res ->
+                                if (res.isFailure) {
+                                    val err = res.exceptionOrNull()?.localizedMessage ?: "Failed to sync profile"
+                                    android.widget.Toast.makeText(context, err, android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        )
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(context, e.localizedMessage ?: "Authentication failed", android.widget.Toast.LENGTH_LONG).show()
+                    }
                 }
             )
         }
@@ -106,8 +228,39 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
         ScreenState.WORKER_AUTH -> {
             WorkerAuthScreen(
                 onBack = { viewModel.handleBack() },
-                onSuccess = { name, phone, sType, area, exp, photoUrl ->
-                    viewModel.registerWorker(name, phone, sType, area, exp, photoUrl)
+                onSuccess = { uid, gName, gEmail, name, phone, sType, area, exp, photoUrl, idToken ->
+                    try {
+                        viewModel.registerWorkerWithGoogle(
+                            firebaseUid = uid,
+                            googleName = gName,
+                            googleEmail = gEmail,
+                            enteredName = name,
+                            enteredPhone = phone,
+                            serviceType = sType,
+                            area = area,
+                            exp = exp,
+                            photoUrl = photoUrl,
+                            firebaseIdToken = idToken,
+                            onComplete = { res ->
+                                if (res.isFailure) {
+                                    val err = res.exceptionOrNull()?.localizedMessage ?: "Failed to sync profile"
+                                    android.widget.Toast.makeText(context, err, android.widget.Toast.LENGTH_LONG).show()
+                                }
+                            }
+                        )
+                    } catch (e: Exception) {
+                        android.widget.Toast.makeText(context, e.localizedMessage ?: "Authentication failed", android.widget.Toast.LENGTH_LONG).show()
+                    }
+                }
+            )
+        }
+
+        ScreenState.OFFERS -> {
+            OffersScreen(
+                offers = offers,
+                onBack = { viewModel.handleBack() },
+                onSelectOffer = { offer ->
+                    viewModel.openBusinessProfileById(offer.businessId)
                 }
             )
         }
@@ -123,8 +276,7 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
                     onStartChat = { viewModel.openChat(business) },
                     onBack = { viewModel.handleBack() },
                     onSelectOffer = {
-                        // Open offer in explore deals
-                        viewModel.selectTab(1)
+                        viewModel.openOffersScreen()
                     }
                 )
             } ?: run {
@@ -172,12 +324,23 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
             )
         }
 
+        ScreenState.REEL_DETAIL -> {
+            ReelDetailScreen(
+                reel = selectedReel,
+                likedReelIds = likedReelIds,
+                onToggleLike = { viewModel.toggleLikeReel(it) },
+                onOpenBusiness = { viewModel.openBusinessProfileById(it) },
+                onOpenChat = { viewModel.openChatByBusinessId(it) },
+                onBack = { viewModel.handleBack() }
+            )
+        }
+
         ScreenState.MAIN_TABS -> {
             Scaffold(
                 bottomBar = {
                     NavigationBar(
-                        containerColor = if (selectedTab == 2) Color.Black else MaterialTheme.colorScheme.surface,
-                        contentColor = if (selectedTab == 2) Color.White else MaterialTheme.colorScheme.onSurface,
+                        containerColor = if (selectedTab == 1) Color.Black else MaterialTheme.colorScheme.surface,
+                        contentColor = if (selectedTab == 1) Color.White else MaterialTheme.colorScheme.onSurface,
                         tonalElevation = 6.dp,
                         modifier = Modifier.testTag("bottom_nav_bar")
                     ) {
@@ -192,58 +355,44 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
                                 )
                             },
                             label = { Text("Home", fontSize = 11.sp, fontWeight = if (selectedTab == 0) FontWeight.Bold else FontWeight.Normal) },
-                            colors = getNavColors(selectedTab == 2)
+                            colors = getNavColors(selectedTab == 1)
                         )
 
-                        // Tab 1: Explore (with Offers / Deals on top)
+                        // Tab 1: Reels
                         NavigationBarItem(
                             selected = selectedTab == 1,
                             onClick = { viewModel.selectTab(1) },
                             icon = {
                                 Icon(
-                                    imageVector = if (selectedTab == 1) Icons.Filled.Explore else Icons.Outlined.Explore,
-                                    contentDescription = "Explore"
+                                    imageVector = if (selectedTab == 1) Icons.Filled.PlayCircleFilled else Icons.Outlined.PlayCircleOutline,
+                                    contentDescription = "Reels"
                                 )
                             },
-                            label = { Text("Explore", fontSize = 11.sp, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) },
-                            colors = getNavColors(selectedTab == 2)
+                            label = { Text("Reels", fontSize = 11.sp, fontWeight = if (selectedTab == 1) FontWeight.Bold else FontWeight.Normal) },
+                            colors = getNavColors(selectedTab == 1)
                         )
 
-                        // Tab 2: Reels
+                        // Tab 2: Workers
                         NavigationBarItem(
                             selected = selectedTab == 2,
                             onClick = { viewModel.selectTab(2) },
                             icon = {
                                 Icon(
-                                    imageVector = if (selectedTab == 2) Icons.Filled.PlayCircleFilled else Icons.Outlined.PlayCircleOutline,
-                                    contentDescription = "Reels"
+                                    imageVector = if (selectedTab == 2) Icons.Filled.Build else Icons.Outlined.Build,
+                                    contentDescription = "Workers"
                                 )
                             },
-                            label = { Text("Reels", fontSize = 11.sp, fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal) },
-                            colors = getNavColors(selectedTab == 2)
+                            label = { Text("Workers", fontSize = 11.sp, fontWeight = if (selectedTab == 2) FontWeight.Bold else FontWeight.Normal) },
+                            colors = getNavColors(selectedTab == 1)
                         )
 
-                        // FIX 5: Tab 3: Workers with WRENCH ICON
+                        // Tab 3: Profile / Dashboard
                         NavigationBarItem(
                             selected = selectedTab == 3,
                             onClick = { viewModel.selectTab(3) },
                             icon = {
                                 Icon(
-                                    imageVector = if (selectedTab == 3) Icons.Filled.Build else Icons.Outlined.Build,
-                                    contentDescription = "Workers"
-                                )
-                            },
-                            label = { Text("Workers", fontSize = 11.sp, fontWeight = if (selectedTab == 3) FontWeight.Bold else FontWeight.Normal) },
-                            colors = getNavColors(selectedTab == 2)
-                        )
-
-                        // Tab 4: Profile / Dashboard
-                        NavigationBarItem(
-                            selected = selectedTab == 4,
-                            onClick = { viewModel.selectTab(4) },
-                            icon = {
-                                Icon(
-                                    imageVector = if (selectedTab == 4) Icons.Filled.Person else Icons.Outlined.Person,
+                                    imageVector = if (selectedTab == 3) Icons.Filled.Person else Icons.Outlined.Person,
                                     contentDescription = "Profile"
                                 )
                             },
@@ -255,10 +404,10 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
                                         else -> "Profile"
                                     },
                                     fontSize = 11.sp,
-                                    fontWeight = if (selectedTab == 4) FontWeight.Bold else FontWeight.Normal
+                                    fontWeight = if (selectedTab == 3) FontWeight.Bold else FontWeight.Normal
                                 )
                             },
-                            colors = getNavColors(selectedTab == 2)
+                            colors = getNavColors(selectedTab == 1)
                         )
                     }
                 }
@@ -271,30 +420,22 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
                             followedIds = followedIds,
                             onFollowClick = { viewModel.toggleFollow(it) },
                             onSelectBusiness = { viewModel.openBusinessProfile(it) },
-                            onSelectOffer = { viewModel.selectTab(1) },
-                            onNavigateToExplore = { viewModel.selectTab(1) }
+                            onSelectOffer = { viewModel.openOffersScreen() },
+                            onNavigateToOffers = { viewModel.openOffersScreen() }
                         )
 
-                        1 -> ExploreScreen(
-                            businesses = businesses,
-                            offers = offers,
-                            followedIds = followedIds,
-                            onFollowClick = { viewModel.toggleFollow(it) },
-                            onSelectBusiness = { viewModel.openBusinessProfile(it) },
-                            onOpenWorkerDirectory = { viewModel.selectTab(3) }
-                        )
-
-                        2 -> ReelsScreen(
+                        1 -> ReelsScreen(
                             reels = reels,
                             currentUser = currentUser,
                             likedReelIds = likedReelIds,
+                            remainingQuota = currentUser?.let { viewModel.getRemainingReelQuota(it.firebaseUid.ifBlank { it.id }) } ?: 0,
                             onToggleLike = { viewModel.toggleLikeReel(it) },
                             onOpenBusiness = { viewModel.openBusinessProfileById(it) },
                             onOpenChat = { viewModel.openChatByBusinessId(it) },
                             onUploadReel = { title, caption -> viewModel.uploadReel(title, caption) }
                         )
 
-                        3 -> WorkerDirectoryScreen(
+                        2 -> WorkerDirectoryScreen(
                             workers = workers,
                             onAddWorker = { name, sType, phone, area, exp ->
                                 viewModel.addWorker(name, sType, phone, area, exp)
@@ -302,7 +443,7 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
                             onBack = null
                         )
 
-                        4 -> ProfileDashboardScreen(
+                        3 -> ProfileDashboardScreen(
                             currentUser = currentUser,
                             businesses = businesses,
                             reels = reels,
@@ -324,12 +465,15 @@ fun SheherHimmatnagarApp(viewModel: MainViewModel) {
                             onUpdateWorker = { wId, name, sType, ph, area, exp ->
                                 viewModel.updateWorkerProfile(wId, name, sType, ph, area, exp)
                             },
-                            onSwitchRole = { viewModel.switchRole(it) },
+                            onUpdatePhone = { viewModel.updateUserPhone(it) },
+                            remainingQuota = currentUser?.let { viewModel.getRemainingReelQuota(it.firebaseUid.ifBlank { it.id }) } ?: 0,
                             onOpenAdminPanel = { viewModel.navigateTo(ScreenState.ADMIN_PANEL) },
                             onLogout = { viewModel.logout() }
                         )
                     }
                 }
+            }
+        }
             }
         }
     }

@@ -1,4 +1,4 @@
-# Sheher Himmatnagar (શહેર હિંમતનગર)
+# HMT (Himmatnagar)
 
 Local business discovery platform, Instagram-style reels feed with 10-day auto-expiry, and deals finder for the city of Himmatnagar, Gujarat.
 
@@ -37,54 +37,20 @@ SELECT cron.schedule(
 
 ---
 
-## 2. Web Deployment (Next.js / Vercel)
+## 2. Android App Connection
 
-1. Clone or export repository.
-2. Configure `.env.local`:
-   ```env
-   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-   ```
-3. Deploy to Vercel:
-   ```bash
-   vercel --prod
-   ```
+The native Android app (`com.aistudio.sheherhimmatnagar.kznvxp`) connects to Supabase using:
+- **Supabase URL:** `https://your-project.supabase.co`
+- **Supabase Anon Key:** Your public anonymous key
+
+> ⚠️ **CRITICAL SECURITY NOTE:**
+> NEVER embed the `service_role` key into the Android app or APK. The `service_role` key bypasses all Row Level Security (RLS) policies. Only use the public `anon` key.
 
 ---
 
-## 3. Capacitor & Android APK Build
+## 3. Auto-Delete Expiry Strategy
 
-1. Build web assets:
-   ```bash
-   npm run build
-   npx cap sync android
-   ```
-2. Open Android Studio:
-   ```bash
-   npx cap open android
-   ```
-3. Or build directly with Gradle:
-   ```bash
-   gradle assembleRelease
-   ```
-
----
-
-## 4. Publishing to Google Play Store
-
-1. **Keystore Signing**:
-   Generate an upload keystore:
-   ```bash
-   keytool -genkey -v -keystore himmatnagar-release.jks -alias himmatnagar -keyalg RSA -keysize 2048 -validity 10000
-   ```
-2. **Build Android App Bundle (AAB)**:
-   ```bash
-   gradle bundleRelease
-   ```
-   The `.aab` output will be at `app/build/outputs/bundle/release/app-release.aab`.
-3. **Google Play Console Setup**:
-   - Create app under "Sheher Himmatnagar"
-   - Category: "Shopping" or "Local & Lifestyle"
-   - Content Rating: Everyone
-   - Privacy Policy URL: host privacy policy detailing camera/phone permissions.
-   - Upload `app-release.aab` under Production / Internal Testing track.
+Reels in the app are promotional announcements intended to stay fresh. The `reels` table has an automated 10-day expiry mechanism:
+- When a reel is inserted, a PostgreSQL trigger sets `expires_at = created_at + INTERVAL '10 days'`.
+- The pg_cron job in `cron.sql` periodically calls `public.delete_expired_reels()`.
+- Client-side, expired reels are filtered out by `Offer.isExpired()` and `Reel.isExpired()`.

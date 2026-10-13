@@ -1,13 +1,21 @@
 package com.example.data.repository
 
+import android.content.Context
+import com.example.data.local.LocalPreferences
 import com.example.data.model.*
+import com.example.data.supabase.SupabaseDataSource
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-class HimmatnagarRepository {
+class HimmatnagarRepository(
+    context: Context? = null,
+    val supabaseDataSource: SupabaseDataSource = SupabaseDataSource()
+) {
+
+    private var localPrefs: LocalPreferences? = context?.let { LocalPreferences(it) }
 
     private val _currentUser = MutableStateFlow<UserProfile?>(null)
     val currentUser: StateFlow<UserProfile?> = _currentUser.asStateFlow()
@@ -36,8 +44,63 @@ class HimmatnagarRepository {
     private val _businessViews = MutableStateFlow<Map<String, Int>>(emptyMap())
     val businessViews: StateFlow<Map<String, Int>> = _businessViews.asStateFlow()
 
+    private val _registeredUsers = MutableStateFlow<List<UserProfile>>(emptyList())
+    val registeredUsers: StateFlow<List<UserProfile>> = _registeredUsers.asStateFlow()
+
+    // Monthly Reel Quota Tracker Ledger (Asia/Kolkata timezone, max 3 per month)
+    private val _reelUploadUsage = mutableMapOf<String, Int>()
+
     init {
         seedInitialData()
+        restorePersistedState()
+    }
+
+    private fun restorePersistedState() {
+        val loadedUsers = localPrefs?.loadRegisteredUsers() ?: emptyList()
+        if (loadedUsers.isNotEmpty()) {
+            _registeredUsers.value = loadedUsers
+        }
+
+        localPrefs?.loadCurrentUser()?.let { user ->
+            _currentUser.value = user
+            if (!_registeredUsers.value.any { it.firebaseUid == user.firebaseUid || it.id == user.id }) {
+                _registeredUsers.value = _registeredUsers.value + user
+            }
+        }
+        val followed = localPrefs?.loadFollowedBusinesses() ?: emptySet()
+        if (followed.isNotEmpty()) {
+            _followedBusinessIds.value = followed
+        }
+        val liked = localPrefs?.loadLikedReels() ?: emptySet()
+        if (liked.isNotEmpty()) {
+            _likedReelIds.value = liked
+        }
+    }
+
+    companion object {
+        @Volatile
+        private var INSTANCE: HimmatnagarRepository? = null
+
+        fun getInstance(context: Context? = null): HimmatnagarRepository {
+            return INSTANCE ?: synchronized(this) {
+                INSTANCE ?: HimmatnagarRepository(context?.applicationContext).also {
+                    INSTANCE = it
+                }
+            }
+        }
+
+        fun init(context: Context): HimmatnagarRepository {
+            val repo = getInstance(context)
+            if (repo.localPrefs == null) {
+                repo.localPrefs = LocalPreferences(context.applicationContext)
+                repo.restorePersistedState()
+            }
+            return repo
+        }
+
+        fun createForTesting(): HimmatnagarRepository {
+            return HimmatnagarRepository(null)
+        }
     }
 
     private fun seedInitialData() {
@@ -421,16 +484,273 @@ class HimmatnagarRepository {
     // Auth & User Role Methods
     fun setCurrentUser(user: UserProfile?) {
         _currentUser.value = user
+        localPrefs?.saveCurrentUser(user)
     }
 
-    fun loginOrRegisterCustomer(name: String, phone: String) {
+    fun findUserByFirebaseUid(firebaseUid: String): UserProfile? {
+        val uid = firebaseUid.trim()
+        if (uid.isBlank()) return null
+        return _registeredUsers.value.find { it.firebaseUid == uid || it.id == uid }
+            ?: _currentUser.value?.takeIf { it.firebaseUid == uid || it.id == uid }
+    }
+
+    fun updateUserPhone(firebaseUid: String, newPhone: String): UserProfile? {
+        val trimmedPhone = newPhone.trim()
+        if (trimmedPhone.isBlank()) return null
+        val existing = findUserByFirebaseUid(firebaseUid) ?: return null
+        val updated = existing.copy(
+            phone = trimmedPhone,
+            updatedAt = System.currentTimeMillis()
+        )
+        _registeredUsers.value = _registeredUsers.value.map {
+            if (it.firebaseUid == firebaseUid || it.id == firebaseUid) updated else it
+        }
+        if (_currentUser.value?.firebaseUid == firebaseUid || _currentUser.value?.id == firebaseUid) {
+            _currentUser.value = updated
+            localPrefs?.saveCurrentUser(updated)
+        }
+        localPrefs?.saveRegisteredUsers(_registeredUsers.value)
+        return updated
+    }
+
+    fun loginExistingUserWithGoogle(
+        firebaseUid: String,
+        googleEmail: String = "",
+        googleName: String = ""
+    ): UserProfile? {
+        val cleanUid = firebaseUid.trim()
+        val existing = findUserByFirebaseUid(cleanUid) ?: return null
+        val updated = existing.copy(
+            email = if (googleEmail.isNotBlank()) googleEmail.trim() else existing.email,
+            name = if (existing.name.isBlank() && googleName.isNotBlank()) googleName.trim() else existing.name,
+            googleDisplayName = if (googleName.isNotBlank()) googleName.trim() else existing.googleDisplayName,
+            updatedAt = System.currentTimeMillis()
+        )
+        _registeredUsers.value = _registeredUsers.value.map {
+            if (it.firebaseUid == cleanUid || it.id == cleanUid) updated else it
+        }
+        _currentUser.value = updated
+        localPrefs?.saveCurrentUser(updated)
+        localPrefs?.saveRegisteredUsers(_registeredUsers.value)
+        return updated
+    }
+
+    fun loginOrRegisterCustomerWithGoogle(
+        firebaseUid: String,
+        googleName: String,
+        googleEmail: String,
+        enteredPhone: String,
+        enteredName: String
+    ): UserProfile {
+        val cleanUid = firebaseUid.trim()
+        val cleanGoogleName = googleName.trim()
+        val cleanGoogleEmail = googleEmail.trim()
+        val cleanPhone = enteredPhone.trim()
+        val cleanName = if (enteredName.isNotBlank()) enteredName.trim() else cleanGoogleName
+
+        val existing = findUserByFirebaseUid(cleanUid)
+        if (existing != null) {
+            if (existing.role != UserRole.CUSTOMER) {
+                throw IllegalStateException("This Google account is already registered as a ${existing.role.name.lowercase().replaceFirstChar { it.uppercase() }}. Please sign in using your existing role.")
+            }
+            val updated = existing.copy(
+                phone = if (cleanPhone.isNotBlank()) cleanPhone else existing.phone,
+                name = if (cleanName.isNotBlank() && existing.name.isBlank()) cleanName else existing.name,
+                email = if (cleanGoogleEmail.isNotBlank()) cleanGoogleEmail else existing.email,
+                googleDisplayName = if (cleanGoogleName.isNotBlank()) cleanGoogleName else existing.googleDisplayName,
+                updatedAt = System.currentTimeMillis()
+            )
+            _registeredUsers.value = _registeredUsers.value.map {
+                if (it.firebaseUid == cleanUid || it.id == cleanUid) updated else it
+            }
+            _currentUser.value = updated
+            localPrefs?.saveCurrentUser(updated)
+            localPrefs?.saveRegisteredUsers(_registeredUsers.value)
+            return updated
+        }
+
+        val newUser = UserProfile(
+            id = cleanUid,
+            firebaseUid = cleanUid,
+            phone = cleanPhone,
+            email = cleanGoogleEmail,
+            googleDisplayName = cleanGoogleName,
+            role = UserRole.CUSTOMER,
+            name = if (cleanName.isNotBlank()) cleanName else "Customer"
+        )
+        _registeredUsers.value = _registeredUsers.value + newUser
+        _currentUser.value = newUser
+        localPrefs?.saveCurrentUser(newUser)
+        localPrefs?.saveRegisteredUsers(_registeredUsers.value)
+        return newUser
+    }
+
+    fun loginOrRegisterOwnerWithGoogle(
+        firebaseUid: String,
+        googleName: String,
+        googleEmail: String,
+        enteredOwnerName: String,
+        enteredPhone: String,
+        shopName: String,
+        category: String,
+        area: String,
+        address: String,
+        whatsapp: String
+    ): Pair<UserProfile, Business?> {
+        val cleanUid = firebaseUid.trim()
+        val cleanGoogleName = googleName.trim()
+        val cleanGoogleEmail = googleEmail.trim()
+        val cleanOwnerName = if (enteredOwnerName.isNotBlank()) enteredOwnerName.trim() else cleanGoogleName
+        val cleanPhone = enteredPhone.trim()
+        val cleanShop = shopName.trim()
+        val cleanCat = category.trim()
+        val cleanArea = area.trim()
+        val cleanAddr = address.trim()
+        val cleanWa = if (whatsapp.isNotBlank()) whatsapp.trim() else cleanPhone
+
+        val existing = findUserByFirebaseUid(cleanUid)
+        if (existing != null) {
+            if (existing.role != UserRole.OWNER) {
+                throw IllegalStateException("This Google account is already registered as a ${existing.role.name.lowercase().replaceFirstChar { it.uppercase() }}. Please sign in using your existing role.")
+            }
+            val updatedUser = existing.copy(
+                phone = if (cleanPhone.isNotBlank()) cleanPhone else existing.phone,
+                email = if (cleanGoogleEmail.isNotBlank()) cleanGoogleEmail else existing.email,
+                updatedAt = System.currentTimeMillis()
+            )
+            _registeredUsers.value = _registeredUsers.value.map {
+                if (it.firebaseUid == cleanUid || it.id == cleanUid) updatedUser else it
+            }
+            _currentUser.value = updatedUser
+            localPrefs?.saveCurrentUser(updatedUser)
+            localPrefs?.saveRegisteredUsers(_registeredUsers.value)
+            val existingBusiness = _businesses.value.find { it.ownerId == cleanUid || it.ownerId == existing.id }
+            return Pair(updatedUser, existingBusiness)
+        }
+
+        val newUser = UserProfile(
+            id = cleanUid,
+            firebaseUid = cleanUid,
+            phone = cleanPhone,
+            email = cleanGoogleEmail,
+            role = UserRole.OWNER,
+            name = if (cleanOwnerName.isNotBlank()) cleanOwnerName else "Business Owner"
+        )
+        _registeredUsers.value = _registeredUsers.value + newUser
+        _currentUser.value = newUser
+        localPrefs?.saveCurrentUser(newUser)
+        localPrefs?.saveRegisteredUsers(_registeredUsers.value)
+
+        val newBusiness = Business(
+            id = "b_${cleanUid.take(8)}",
+            ownerId = cleanUid,
+            name = cleanShop,
+            category = cleanCat,
+            phone = cleanPhone,
+            whatsapp = cleanWa,
+            area = cleanArea,
+            address = if (cleanAddr.isNotBlank()) cleanAddr else "$cleanArea, Himmatnagar",
+            lat = HimmatnagarLocations.CENTER_LAT + (Math.random() - 0.5) * 0.01,
+            lng = HimmatnagarLocations.CENTER_LNG + (Math.random() - 0.5) * 0.01,
+            bio = "Official store in $cleanArea, Himmatnagar. Welcome customers for best deals and authentic products.",
+            isApproved = true,
+            followerCount = 0,
+            rating = 0f,
+            reviewCount = 0
+        )
+        _businesses.value = listOf(newBusiness) + _businesses.value
+        _businessViews.value = _businessViews.value + (newBusiness.id to 0)
+        return Pair(newUser, newBusiness)
+    }
+
+    fun loginOrRegisterWorkerWithGoogle(
+        firebaseUid: String,
+        googleName: String,
+        googleEmail: String,
+        enteredName: String,
+        enteredPhone: String,
+        serviceType: String,
+        area: String,
+        exp: String,
+        photoUrl: String = ""
+    ): Pair<UserProfile, Worker?> {
+        val cleanUid = firebaseUid.trim()
+        val cleanGoogleName = googleName.trim()
+        val cleanGoogleEmail = googleEmail.trim()
+        val cleanWorkerName = if (enteredName.isNotBlank()) enteredName.trim() else cleanGoogleName
+        val cleanPhone = enteredPhone.trim()
+        val cleanService = serviceType.trim()
+        val cleanArea = area.trim()
+        val cleanExp = exp.trim()
+
+        val existing = findUserByFirebaseUid(cleanUid)
+        if (existing != null) {
+            if (existing.role != UserRole.WORKER) {
+                throw IllegalStateException("This Google account is already registered as a ${existing.role.name.lowercase().replaceFirstChar { it.uppercase() }}. Please sign in using your existing role.")
+            }
+            val updatedUser = existing.copy(
+                phone = if (cleanPhone.isNotBlank()) cleanPhone else existing.phone,
+                email = if (cleanGoogleEmail.isNotBlank()) cleanGoogleEmail else existing.email,
+                updatedAt = System.currentTimeMillis()
+            )
+            _registeredUsers.value = _registeredUsers.value.map {
+                if (it.firebaseUid == cleanUid || it.id == cleanUid) updatedUser else it
+            }
+            _currentUser.value = updatedUser
+            localPrefs?.saveCurrentUser(updatedUser)
+            localPrefs?.saveRegisteredUsers(_registeredUsers.value)
+            val existingWorker = _workers.value.find { it.profileId == cleanUid || it.id == cleanUid || it.profileId == existing.id }
+            return Pair(updatedUser, existingWorker)
+        }
+
+        val newUser = UserProfile(
+            id = cleanUid,
+            firebaseUid = cleanUid,
+            phone = cleanPhone,
+            email = cleanGoogleEmail,
+            role = UserRole.WORKER,
+            name = if (cleanWorkerName.isNotBlank()) cleanWorkerName else "Worker"
+        )
+        _registeredUsers.value = _registeredUsers.value + newUser
+        _currentUser.value = newUser
+        localPrefs?.saveCurrentUser(newUser)
+        localPrefs?.saveRegisteredUsers(_registeredUsers.value)
+
+        val newWorker = Worker(
+            id = "w_${cleanUid.take(8)}",
+            profileId = cleanUid,
+            name = cleanWorkerName,
+            serviceType = cleanService,
+            phone = cleanPhone,
+            email = cleanGoogleEmail,
+            whatsapp = cleanPhone,
+            area = cleanArea,
+            experienceYears = if (cleanExp.isNotBlank()) cleanExp else "Experienced",
+            photoUrl = photoUrl.trim(),
+            rating = 0f,
+            createdBy = "Registered Worker"
+        )
+        _workers.value = listOf(newWorker) + _workers.value
+        return Pair(newUser, newWorker)
+    }
+
+    fun loginOrRegisterCustomer(name: String, phone: String, email: String = "") {
+        val trimmedName = name.trim()
+        val trimmedPhone = phone.trim()
+        val trimmedEmail = email.trim()
+        if (trimmedName.isBlank() || (trimmedPhone.isBlank() && trimmedEmail.isBlank())) return
+
         val user = UserProfile(
             id = "user_${UUID.randomUUID().toString().take(8)}",
-            phone = phone,
+            phone = trimmedPhone,
+            email = trimmedEmail,
             role = UserRole.CUSTOMER,
-            name = name
+            name = trimmedName
         )
+        _registeredUsers.value = _registeredUsers.value + user
         _currentUser.value = user
+        localPrefs?.saveCurrentUser(user)
+        localPrefs?.saveRegisteredUsers(_registeredUsers.value)
     }
 
     fun loginOrRegisterOwner(
@@ -441,28 +761,43 @@ class HimmatnagarRepository {
         area: String,
         address: String,
         whatsapp: String
-    ): Business {
+    ): Business? {
+        val trimmedShop = shopName.trim()
+        val trimmedOwner = ownerName.trim()
+        val trimmedPhone = phone.trim()
+        val trimmedCat = category.trim()
+        val trimmedArea = area.trim()
+        val trimmedAddr = address.trim()
+        val trimmedWa = whatsapp.trim()
+
+        if (trimmedShop.isBlank() || trimmedOwner.isBlank() || trimmedPhone.isBlank() || trimmedCat.isBlank() || trimmedArea.isBlank()) {
+            return null
+        }
+
         val ownerId = "owner_${UUID.randomUUID().toString().take(8)}"
         val user = UserProfile(
             id = ownerId,
-            phone = phone,
+            phone = trimmedPhone,
             role = UserRole.OWNER,
-            name = ownerName
+            name = trimmedOwner
         )
+        _registeredUsers.value = _registeredUsers.value + user
         _currentUser.value = user
+        localPrefs?.saveCurrentUser(user)
+        localPrefs?.saveRegisteredUsers(_registeredUsers.value)
 
         val newBusiness = Business(
             id = "b_${UUID.randomUUID().toString().take(8)}",
             ownerId = ownerId,
-            name = shopName,
-            category = category,
-            phone = phone,
-            whatsapp = whatsapp,
-            area = area,
-            address = address,
+            name = trimmedShop,
+            category = trimmedCat,
+            phone = trimmedPhone,
+            whatsapp = if (trimmedWa.isNotBlank()) trimmedWa else trimmedPhone,
+            area = trimmedArea,
+            address = if (trimmedAddr.isNotBlank()) trimmedAddr else "$trimmedArea, Himmatnagar",
             lat = HimmatnagarLocations.CENTER_LAT + (Math.random() - 0.5) * 0.01,
             lng = HimmatnagarLocations.CENTER_LNG + (Math.random() - 0.5) * 0.01,
-            bio = "Official store in $area, Himmatnagar. Welcome customers for best deals and authentic products.",
+            bio = "Official store in $trimmedArea, Himmatnagar. Welcome customers for best deals and authentic products.",
             isApproved = true,
             followerCount = 0,
             rating = 0f,
@@ -480,26 +815,39 @@ class HimmatnagarRepository {
         area: String,
         exp: String,
         photoUrl: String = ""
-    ): Worker {
+    ): Worker? {
+        val trimmedName = name.trim()
+        val trimmedPhone = phone.trim()
+        val trimmedService = serviceType.trim()
+        val trimmedArea = area.trim()
+        val trimmedExp = exp.trim()
+
+        if (trimmedName.isBlank() || trimmedPhone.isBlank() || trimmedService.isBlank() || trimmedArea.isBlank()) {
+            return null
+        }
+
         val workerId = "worker_${UUID.randomUUID().toString().take(8)}"
         val user = UserProfile(
             id = workerId,
-            phone = phone,
+            phone = trimmedPhone,
             role = UserRole.WORKER,
-            name = name
+            name = trimmedName
         )
+        _registeredUsers.value = _registeredUsers.value + user
         _currentUser.value = user
+        localPrefs?.saveCurrentUser(user)
+        localPrefs?.saveRegisteredUsers(_registeredUsers.value)
 
         val newWorker = Worker(
             id = workerId,
             profileId = workerId,
-            name = name,
-            serviceType = serviceType,
-            phone = phone,
-            whatsapp = phone,
-            area = area,
-            experienceYears = if (exp.isNotBlank()) exp else "Experienced",
-            photoUrl = photoUrl,
+            name = trimmedName,
+            serviceType = trimmedService,
+            phone = trimmedPhone,
+            whatsapp = trimmedPhone,
+            area = trimmedArea,
+            experienceYears = if (trimmedExp.isNotBlank()) trimmedExp else "Experienced",
+            photoUrl = photoUrl.trim(),
             rating = 0f,
             createdBy = "Registered Worker"
         )
@@ -509,8 +857,8 @@ class HimmatnagarRepository {
 
     fun switchRoleForTesting(newRole: UserRole) {
         val current = _currentUser.value
-        if (current == null) {
-            _currentUser.value = UserProfile(
+        val updated = if (current == null) {
+            UserProfile(
                 id = "demo_user",
                 phone = "+91 98250 00000",
                 role = newRole,
@@ -522,20 +870,26 @@ class HimmatnagarRepository {
                 }
             )
         } else {
-            _currentUser.value = current.copy(role = newRole)
+            current.copy(role = newRole)
         }
+        _currentUser.value = updated
+        localPrefs?.saveCurrentUser(updated)
     }
 
     // Follow / Unfollow
     fun toggleFollow(businessId: String) {
         val current = _followedBusinessIds.value
         if (current.contains(businessId)) {
-            _followedBusinessIds.value = current - businessId
+            val updated = current - businessId
+            _followedBusinessIds.value = updated
+            localPrefs?.saveFollowedBusinesses(updated)
             _businesses.value = _businesses.value.map {
                 if (it.id == businessId) it.copy(followerCount = (it.followerCount - 1).coerceAtLeast(0)) else it
             }
         } else {
-            _followedBusinessIds.value = current + businessId
+            val updated = current + businessId
+            _followedBusinessIds.value = updated
+            localPrefs?.saveFollowedBusinesses(updated)
             _businesses.value = _businesses.value.map {
                 if (it.id == businessId) it.copy(followerCount = it.followerCount + 1) else it
             }
@@ -546,42 +900,212 @@ class HimmatnagarRepository {
     fun toggleLikeReel(reelId: String) {
         val current = _likedReelIds.value
         if (current.contains(reelId)) {
-            _likedReelIds.value = current - reelId
+            val updated = current - reelId
+            _likedReelIds.value = updated
+            localPrefs?.saveLikedReels(updated)
             _reels.value = _reels.value.map {
                 if (it.id == reelId) it.copy(likes = (it.likes - 1).coerceAtLeast(0)) else it
             }
         } else {
-            _likedReelIds.value = current + reelId
+            val updated = current + reelId
+            _likedReelIds.value = updated
+            localPrefs?.saveLikedReels(updated)
             _reels.value = _reels.value.map {
                 if (it.id == reelId) it.copy(likes = it.likes + 1) else it
             }
         }
     }
 
-    // Business Owner Actions
-    fun addReel(businessId: String, title: String, caption: String) {
-        val business = _businesses.value.find { it.id == businessId } ?: return
-        val now = System.currentTimeMillis()
+    // ====================================================================
+    // REEL QUOTA & UPLOAD SYSTEM (Asia/Kolkata calendar month, Max 3 reels)
+    // ====================================================================
+
+    fun getAsiaKolkataYearMonth(timestamp: Long = System.currentTimeMillis()): String {
+        return localPrefs?.getAsiaKolkataYearMonth(timestamp) ?: run {
+            val cal = java.util.Calendar.getInstance(java.util.TimeZone.getTimeZone("Asia/Kolkata"))
+            cal.timeInMillis = timestamp
+            val year = cal.get(java.util.Calendar.YEAR)
+            val month = cal.get(java.util.Calendar.MONTH) + 1
+            String.format(java.util.Locale.US, "%04d-%02d", year, month)
+        }
+    }
+
+    fun getMonthlyReelUploadCount(uploaderId: String, yearMonth: String = getAsiaKolkataYearMonth()): Int {
+        val key = "$uploaderId:$yearMonth"
+        return _reelUploadUsage[key] ?: localPrefs?.getMonthlyReelUploadCount(uploaderId, yearMonth) ?: 0
+    }
+
+    fun getRemainingMonthlyReelQuota(uploaderId: String, yearMonth: String = getAsiaKolkataYearMonth()): Int {
+        return (3 - getMonthlyReelUploadCount(uploaderId, yearMonth)).coerceAtLeast(0)
+    }
+
+    fun setMonthlyReelUploadCountForTesting(uploaderId: String, yearMonth: String, count: Int) {
+        val key = "$uploaderId:$yearMonth"
+        _reelUploadUsage[key] = count
+        localPrefs?.saveMonthlyReelUploadCount(uploaderId, yearMonth, count)
+    }
+
+    private fun incrementMonthlyReelUploadCount(uploaderId: String, yearMonth: String = getAsiaKolkataYearMonth()): Int {
+        val current = getMonthlyReelUploadCount(uploaderId, yearMonth)
+        val next = current + 1
+        val key = "$uploaderId:$yearMonth"
+        _reelUploadUsage[key] = next
+        localPrefs?.saveMonthlyReelUploadCount(uploaderId, yearMonth, next)
+        return next
+    }
+
+    fun publishReel(
+        uploader: UserProfile,
+        title: String,
+        caption: String,
+        videoUriString: String = "",
+        videoDurationSeconds: Int = 30,
+        fileSizeBytes: Long = 5_000_000L,
+        simulatedFailure: Boolean = false
+    ): ReelUploadResult {
+        // 1. Role verification: ONLY Business Owner and Worker allowed. Customer REJECTED!
+        if (uploader.role == UserRole.CUSTOMER) {
+            return ReelUploadResult.Error("Unauthorized: Customers are not permitted to upload reels.")
+        }
+        if (uploader.role != UserRole.OWNER && uploader.role != UserRole.WORKER && uploader.role != UserRole.ADMIN) {
+            return ReelUploadResult.Error("Unauthorized role for uploading reels: ${uploader.role}")
+        }
+
+        // 2. Input validation
+        val trimmedTitle = title.trim()
+        val trimmedCaption = caption.trim()
+        if (trimmedTitle.isBlank() || trimmedCaption.isBlank()) {
+            return ReelUploadResult.Error("Title and caption cannot be blank.")
+        }
+
+        // 3. Video constraints: max 60s, max 50MB
+        if (videoDurationSeconds > 60) {
+            return ReelUploadResult.Error("Video duration exceeds the maximum limit of 60 seconds.")
+        }
+        if (fileSizeBytes > 50 * 1024 * 1024) {
+            return ReelUploadResult.Error("Video file size exceeds the 50MB limit.")
+        }
+
+        // 4. Monthly quota check (Asia/Kolkata calendar month, max 3)
+        val uploaderId = uploader.firebaseUid.ifBlank { uploader.id }
+        val currentMonthKey = getAsiaKolkataYearMonth()
+        val currentUploadCount = getMonthlyReelUploadCount(uploaderId, currentMonthKey)
+        if (currentUploadCount >= 3) {
+            return ReelUploadResult.Error("Monthly reel limit reached. You can upload again next month.")
+        }
+
+        // 5. Simulated failure handling: must not consume quota!
+        if (simulatedFailure) {
+            return ReelUploadResult.Error("Upload failed: Storage upload encountered an error. Quota was not consumed.")
+        }
+
+        // 6. Calculate server timestamps: created_at and strictly created_at + 10 days
+        val serverCreatedAt = System.currentTimeMillis()
+        val serverExpiresAt = serverCreatedAt + TimeUnit.DAYS.toMillis(10)
+
+        // 7. Resolve business/worker identity and exact storage paths
+        val reelId = "reel_${UUID.randomUUID().toString().take(8)}"
+        val storageBucket = "reels-videos"
+        val storagePath = "reels/$uploaderId/$reelId.mp4"
+        val videoUrl = "https://supabase.sheherhimmatnagar.local/storage/v1/object/public/$storageBucket/$storagePath"
+
+        var bId = ""
+        var wId = ""
+        var bName = "Himmatnagar Trader"
+        var bCat = "Local Business"
+        var bPhone = uploader.phone
+        var bWa = uploader.phone
+
+        if (uploader.role == UserRole.OWNER) {
+            val business = _businesses.value.find { it.ownerId == uploader.id || it.ownerId == uploader.firebaseUid }
+                ?: _businesses.value.firstOrNull()
+            if (business != null) {
+                bId = business.id
+                bName = business.name
+                bCat = business.category
+                bPhone = business.phone
+                bWa = business.whatsapp
+            }
+        } else if (uploader.role == UserRole.WORKER) {
+            val worker = _workers.value.find { it.profileId == uploader.id || it.profileId == uploader.firebaseUid }
+            wId = worker?.id ?: uploaderId
+            bName = worker?.name ?: uploader.name
+            bCat = worker?.serviceType ?: "Local Services"
+            bPhone = worker?.phone ?: uploader.phone
+            bWa = worker?.whatsapp ?: uploader.phone
+        } else {
+            bId = "b1"
+            bName = "HMT Admin"
+        }
+
         val newReel = Reel(
-            id = "reel_${UUID.randomUUID().toString().take(8)}",
-            businessId = business.id,
-            businessName = business.name,
-            businessCategory = business.category,
-            businessPhone = business.phone,
-            businessWhatsapp = business.whatsapp,
-            title = title,
-            caption = caption,
+            id = reelId,
+            businessId = bId,
+            workerId = wId,
+            uploaderId = uploaderId,
+            uploaderRole = uploader.role.name,
+            businessName = bName,
+            businessCategory = bCat,
+            businessPhone = bPhone,
+            businessWhatsapp = bWa,
+            storageBucket = storageBucket,
+            storagePath = storagePath,
+            videoUrl = videoUrl,
+            title = trimmedTitle,
+            caption = trimmedCaption,
             likes = 0,
             views = 0,
-            createdAt = now,
-            expiresAt = now + TimeUnit.DAYS.toMillis(10), // Strictly 10 days
+            createdAt = serverCreatedAt,
+            expiresAt = serverExpiresAt,
             gradientColorIndex = (0..3).random()
         )
+
+        // Add to active reels
         _reels.value = listOf(newReel) + _reels.value
+
+        // 8. Consume monthly quota only upon successful publish
+        incrementMonthlyReelUploadCount(uploaderId, currentMonthKey)
+        val remaining = getRemainingMonthlyReelQuota(uploaderId, currentMonthKey)
+
+        return ReelUploadResult.Success(newReel, remaining)
+    }
+
+    // Business Owner Actions
+    fun addReel(businessId: String, title: String, caption: String): Boolean {
+        val trimmedTitle = title.trim()
+        val trimmedCaption = caption.trim()
+        if (trimmedTitle.isBlank() || trimmedCaption.isBlank()) return false
+
+        val business = _businesses.value.find { it.id == businessId } ?: return false
+        val current = _currentUser.value
+        // If current user is CUSTOMER, reject!
+        if (current != null && current.role == UserRole.CUSTOMER) {
+            return false
+        }
+        val uploader = current ?: UserProfile(
+            id = business.ownerId,
+            firebaseUid = business.ownerId,
+            phone = business.phone,
+            role = UserRole.OWNER,
+            name = business.name
+        )
+        val result = publishReel(uploader, trimmedTitle, trimmedCaption)
+        return result is ReelUploadResult.Success
     }
 
     fun deleteReel(reelId: String) {
+        // Deleting an old reel does NOT restore the monthly quota!
         _reels.value = _reels.value.filter { it.id != reelId }
+    }
+
+    fun purgeExpiredReels(currentTime: Long = System.currentTimeMillis()): Int {
+        val beforeCount = _reels.value.size
+        _reels.value = _reels.value.filter { !it.isExpired(currentTime) }
+        return beforeCount - _reels.value.size
+    }
+
+    fun getActiveReels(currentTime: Long = System.currentTimeMillis()): List<Reel> {
+        return _reels.value.filter { !it.isExpired(currentTime) }
     }
 
     fun addOffer(
@@ -592,26 +1116,33 @@ class HimmatnagarRepository {
         discountedPrice: Double,
         couponCode: String,
         validUntil: String
-    ) {
-        val business = _businesses.value.find { it.id == businessId } ?: return
-        val discountPercent = if (originalPrice > 0) {
-            (((originalPrice - discountedPrice) / originalPrice) * 100).toInt().coerceIn(1, 99)
-        } else 10
+    ): Boolean {
+        val trimmedProduct = productName.trim()
+        val trimmedCategory = category.trim()
+        val trimmedValidUntil = validUntil.trim()
+        val trimmedCode = (if (couponCode.isBlank()) "SAVE10" else couponCode.trim()).uppercase()
+
+        if (trimmedProduct.isBlank() || trimmedCategory.isBlank() || trimmedValidUntil.isBlank()) return false
+        if (originalPrice <= 0.0 || discountedPrice <= 0.0 || discountedPrice >= originalPrice) return false
+
+        val business = _businesses.value.find { it.id == businessId } ?: return false
+        val discountPercent = (((originalPrice - discountedPrice) / originalPrice) * 100).toInt().coerceIn(1, 99)
 
         val newOffer = Offer(
             id = "off_${UUID.randomUUID().toString().take(8)}",
             businessId = business.id,
             businessName = business.name,
             area = business.area,
-            productName = productName,
-            category = category,
+            productName = trimmedProduct,
+            category = trimmedCategory,
             originalPrice = originalPrice,
             discountedPrice = discountedPrice,
             discountPercent = discountPercent,
-            couponCode = couponCode.uppercase().trim(),
-            validUntil = validUntil
+            couponCode = trimmedCode,
+            validUntil = trimmedValidUntil
         )
         _offers.value = listOf(newOffer) + _offers.value
+        return true
     }
 
     fun deleteOffer(offerId: String) {
@@ -625,13 +1156,18 @@ class HimmatnagarRepository {
         whatsapp: String,
         address: String
     ) {
+        val trimmedBio = bio.trim()
+        val trimmedPhone = phone.trim()
+        val trimmedWa = whatsapp.trim()
+        val trimmedAddr = address.trim()
+
         _businesses.value = _businesses.value.map {
             if (it.id == businessId) {
                 it.copy(
-                    bio = bio,
-                    phone = phone,
-                    whatsapp = whatsapp,
-                    address = address
+                    bio = trimmedBio,
+                    phone = trimmedPhone,
+                    whatsapp = trimmedWa,
+                    address = trimmedAddr
                 )
             } else it
         }
@@ -645,18 +1181,30 @@ class HimmatnagarRepository {
         area: String,
         experienceYears: String
     ) {
+        val trimmedName = name.trim()
+        val trimmedService = serviceType.trim()
+        val trimmedPhone = phone.trim()
+        val trimmedArea = area.trim()
+        val trimmedExp = experienceYears.trim()
+
+        if (trimmedName.isBlank() || trimmedService.isBlank() || trimmedPhone.isBlank() || trimmedArea.isBlank()) {
+            return
+        }
+
         _workers.value = _workers.value.map {
             if (it.id == workerId || it.profileId == workerId) {
                 it.copy(
-                    name = name,
-                    serviceType = serviceType,
-                    phone = phone,
-                    area = area,
-                    experienceYears = experienceYears
+                    name = trimmedName,
+                    serviceType = trimmedService,
+                    phone = trimmedPhone,
+                    area = trimmedArea,
+                    experienceYears = trimmedExp
                 )
             } else it
         }
-        _currentUser.value = _currentUser.value?.copy(name = name, phone = phone)
+        _currentUser.value = _currentUser.value?.copy(name = trimmedName, phone = trimmedPhone).also {
+            localPrefs?.saveCurrentUser(it)
+        }
     }
 
     // Worker Directory Actions
@@ -666,27 +1214,41 @@ class HimmatnagarRepository {
         phone: String,
         area: String,
         exp: String
-    ) {
+    ): Boolean {
+        val trimmedName = name.trim()
+        val trimmedService = serviceType.trim()
+        val trimmedPhone = phone.trim()
+        val trimmedArea = area.trim()
+        val trimmedExp = exp.trim()
+
+        if (trimmedName.isBlank() || trimmedService.isBlank() || trimmedPhone.isBlank() || trimmedArea.isBlank()) {
+            return false
+        }
+
         val newWorker = Worker(
             id = "w_${UUID.randomUUID().toString().take(8)}",
             profileId = "",
-            name = name,
-            serviceType = serviceType,
-            phone = phone,
-            whatsapp = phone,
-            area = area,
-            experienceYears = exp,
+            name = trimmedName,
+            serviceType = trimmedService,
+            phone = trimmedPhone,
+            whatsapp = trimmedPhone,
+            area = trimmedArea,
+            experienceYears = if (trimmedExp.isNotBlank()) trimmedExp else "Experienced",
             rating = 0f,
             createdBy = "Community"
         )
         _workers.value = listOf(newWorker) + _workers.value
+        return true
     }
 
     // Chat Actions
-    fun sendChatMessage(businessId: String, businessName: String, text: String, isFromOwner: Boolean) {
-        val user = _currentUser.value ?: return
+    fun sendChatMessage(businessId: String, businessName: String, text: String, isFromOwner: Boolean): Boolean {
+        val trimmedText = text.trim()
+        if (trimmedText.isBlank()) return false
+
+        val user = _currentUser.value ?: return false
         val customerId = if (isFromOwner) {
-            _chatMessages.value.lastOrNull { it.businessId == businessId && !it.isFromOwner }?.customerId ?: return
+            _chatMessages.value.lastOrNull { it.businessId == businessId && !it.isFromOwner }?.customerId ?: return false
         } else user.id
 
         val newMsg = ChatMessage(
@@ -696,12 +1258,13 @@ class HimmatnagarRepository {
             businessName = businessName,
             senderId = user.id,
             senderName = user.name,
-            text = text,
+            text = trimmedText,
             timestamp = System.currentTimeMillis(),
             isFromOwner = isFromOwner,
             customerId = customerId
         )
         _chatMessages.value = _chatMessages.value + newMsg
+        return true
     }
 
     // Admin Actions
@@ -715,5 +1278,78 @@ class HimmatnagarRepository {
         _businesses.value = _businesses.value.filter { it.id != businessId }
         _offers.value = _offers.value.filter { it.businessId != businessId }
         _reels.value = _reels.value.filter { it.businessId != businessId }
+        val updatedFollows = _followedBusinessIds.value - businessId
+        _followedBusinessIds.value = updatedFollows
+        localPrefs?.saveFollowedBusinesses(updatedFollows)
+        _businessViews.value = _businessViews.value - businessId
+        _chatMessages.value = _chatMessages.value.filter { it.businessId != businessId }
+    }
+
+    // =========================================================================
+    // Supabase Public Data-Source Layer (Read-Only)
+    // =========================================================================
+
+    suspend fun refreshFromSupabase(): Result<Unit> = runCatching {
+        // 1. Fetch public businesses
+        val businessesResult = supabaseDataSource.fetchPublicBusinesses()
+        businessesResult.getOrNull()?.let { remoteBusinesses ->
+            if (remoteBusinesses.isNotEmpty()) {
+                val existingMap = _businesses.value.associateBy { it.id }
+                val merged = remoteBusinesses.map { rb ->
+                    val local = existingMap[rb.id]
+                    if (local != null) {
+                        rb.copy(
+                            followerCount = local.followerCount,
+                            rating = local.rating,
+                            reviewCount = local.reviewCount
+                        )
+                    } else rb
+                }
+                _businesses.value = merged
+            }
+        }
+
+        // 2. Fetch public workers
+        val workersResult = supabaseDataSource.fetchPublicWorkers()
+        workersResult.getOrNull()?.let { remoteWorkers ->
+            if (remoteWorkers.isNotEmpty()) {
+                _workers.value = remoteWorkers
+            }
+        }
+
+        // 3. Fetch active reels
+        val reelsResult = supabaseDataSource.fetchActiveReels()
+        reelsResult.getOrNull()?.let { remoteReels ->
+            if (remoteReels.isNotEmpty()) {
+                val activeOnly = remoteReels.filter { !it.isExpired() }
+                _reels.value = activeOnly
+            }
+        }
+
+        // 4. Fetch public offers
+        val offersResult = supabaseDataSource.fetchPublicOffers()
+        offersResult.getOrNull()?.let { remoteOffers ->
+            if (remoteOffers.isNotEmpty()) {
+                _offers.value = remoteOffers
+            }
+        }
+    }
+
+    suspend fun syncProfileWithEdgeFunction(
+        firebaseIdToken: String,
+        role: String,
+        name: String,
+        phone: String,
+        email: String,
+        avatarUrl: String? = null
+    ): Result<com.example.data.supabase.SyncProfileResponse> {
+        return supabaseDataSource.syncProfileWithEdgeFunction(
+            firebaseIdToken = firebaseIdToken,
+            role = role,
+            name = name,
+            phone = phone,
+            email = email,
+            avatarUrl = avatarUrl
+        )
     }
 }

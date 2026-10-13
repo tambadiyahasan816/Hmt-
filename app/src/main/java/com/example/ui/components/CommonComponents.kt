@@ -585,7 +585,7 @@ fun launchDialer(context: Context, phone: String) {
 fun launchWhatsApp(context: Context, phoneOrWhatsapp: String) {
     try {
         val cleanNumber = phoneOrWhatsapp.replace("+", "").replace(" ", "").replace("-", "")
-        val url = "https://api.whatsapp.com/send?phone=$cleanNumber&text=Hello,%20I%20found%20you%20on%20Sheher%20Himmatnagar%20App!"
+        val url = "https://api.whatsapp.com/send?phone=$cleanNumber&text=Hello,%20I%20found%20you%20on%20HMT%20App!"
         val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
         context.startActivity(intent)
     } catch (e: Exception) {

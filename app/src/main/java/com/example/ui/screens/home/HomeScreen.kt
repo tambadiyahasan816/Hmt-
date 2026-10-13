@@ -38,7 +38,7 @@ fun HomeScreen(
     onFollowClick: (String) -> Unit,
     onSelectBusiness: (Business) -> Unit,
     onSelectOffer: (Offer) -> Unit,
-    onNavigateToExplore: () -> Unit,
+    onNavigateToOffers: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -98,7 +98,7 @@ fun HomeScreen(
                             }
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Sheher Himmatnagar",
+                                text = "HMT",
                                 fontSize = 22.sp,
                                 fontWeight = FontWeight.ExtraBold,
                                 color = Color.White
@@ -256,7 +256,7 @@ fun HomeScreen(
                         )
                     }
 
-                    TextButton(onClick = onNavigateToExplore) {
+                    TextButton(onClick = onNavigateToOffers) {
                         Text("View all (${offers.size})", fontSize = 12.sp)
                     }
                 }

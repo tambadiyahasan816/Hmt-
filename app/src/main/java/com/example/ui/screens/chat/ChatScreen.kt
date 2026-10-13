@@ -18,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,6 +41,8 @@ fun ChatScreen(
     onSendMessage: (text: String, isFromOwner: Boolean) -> Unit,
     onBack: () -> Unit
 ) {
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     var textInput by remember { mutableStateOf("") }
     val isOwner = currentUser?.role == UserRole.OWNER && (currentUser.id == business.ownerId)
 
@@ -87,7 +91,11 @@ fun ChatScreen(
                     }
                 },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(onClick = {
+                        focusManager.clearFocus()
+                        keyboardController?.hide()
+                        onBack()
+                    }) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 },
@@ -99,6 +107,7 @@ fun ChatScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .imePadding()
                 .background(MaterialTheme.colorScheme.background)
         ) {
             // Message List
@@ -191,6 +200,8 @@ fun ChatScreen(
                     items(quickQuestions) { q ->
                         AssistChip(
                             onClick = {
+                                focusManager.clearFocus()
+                                keyboardController?.hide()
                                 onSendMessage(q, false)
                             },
                             label = { Text(q, fontSize = 11.sp) }

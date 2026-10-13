@@ -114,10 +114,14 @@ object HimmatnagarLocations {
 
 data class UserProfile(
     val id: String,
+    val firebaseUid: String = id,
     val phone: String,
     val role: UserRole,
     val name: String,
-    val createdAt: Long = System.currentTimeMillis()
+    val email: String = "",
+    val googleDisplayName: String = "",
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = System.currentTimeMillis()
 )
 
 data class Business(
@@ -152,11 +156,16 @@ data class BusinessPost(
 
 data class Reel(
     val id: String,
-    val businessId: String,
+    val businessId: String = "",
+    val workerId: String = "",
+    val uploaderId: String = "",
+    val uploaderRole: String = "", // "OWNER" or "WORKER"
     val businessName: String,
     val businessCategory: String,
     val businessPhone: String,
     val businessWhatsapp: String,
+    val storageBucket: String = "reels-videos",
+    val storagePath: String = "",
     val videoUrl: String = "",
     val title: String,
     val caption: String,
@@ -178,6 +187,20 @@ data class Reel(
     fun isExpired(currentTime: Long = System.currentTimeMillis()): Boolean {
         return currentTime >= expiresAt
     }
+
+    fun getRemainingTimeText(currentTime: Long = System.currentTimeMillis()): String {
+        val diff = expiresAt - currentTime
+        if (diff <= 0) return "Expired"
+        val hours = TimeUnit.MILLISECONDS.toHours(diff)
+        val days = hours / 24
+        val remHours = hours % 24
+        return if (days > 0) "${days}d ${remHours}h remaining" else "${hours}h remaining"
+    }
+}
+
+sealed interface ReelUploadResult {
+    data class Success(val reel: Reel, val remainingQuota: Int) : ReelUploadResult
+    data class Error(val message: String) : ReelUploadResult
 }
 
 data class Offer(
@@ -212,6 +235,7 @@ data class Worker(
     val name: String,
     val serviceType: String,
     val phone: String,
+    val email: String = "",
     val whatsapp: String = "",
     val area: String,
     val experienceYears: String = "",

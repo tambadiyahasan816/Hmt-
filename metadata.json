@@ -1,5 +1,5 @@
 {
-  "name": "Sheher Himmatnagar",
+  "name": "HMT",
   "description": "Local business discovery, Instagram-style reels, and deals finder for Himmatnagar, Gujarat.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

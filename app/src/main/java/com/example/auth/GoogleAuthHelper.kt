@@ -11,8 +11,6 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
 import kotlinx.coroutines.suspendCancellableCoroutine
-import java.security.MessageDigest
-import java.util.UUID
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -46,13 +44,75 @@ class GoogleAuthHelper(private val context: Context) {
         }
     }
 
-    suspend fun signInWithGoogle(webClientId: String = ""): FirebaseUser? {
-        val serverClientId = if (webClientId.isNotBlank()) {
-            webClientId
-        } else {
-            val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
-            if (resId != 0) context.getString(resId) else ""
+    /**
+     * Retrieves the current Firebase ID token.
+     * Throws an IllegalStateException if the user is not authenticated.
+     */
+    suspend fun getFirebaseIdToken(forceRefresh: Boolean = false): String =
+        suspendCancellableCoroutine { continuation ->
+            val user = auth.currentUser
+            if (user == null) {
+                continuation.resumeWithException(IllegalStateException("No authenticated Firebase user found"))
+                return@suspendCancellableCoroutine
+            }
+            user.getIdToken(forceRefresh)
+                .addOnSuccessListener { result ->
+                    val token = result.token
+                    if (!token.isNullOrBlank()) {
+                        continuation.resume(token)
+                    } else {
+                        continuation.resumeWithException(IllegalStateException("Received empty Firebase ID token"))
+                    }
+                }
+                .addOnFailureListener { exception ->
+                    continuation.resumeWithException(exception)
+                }
         }
+
+    fun getWebClientId(webClientId: String = ""): String {
+        if (webClientId.isNotBlank()) return webClientId
+
+        // 1. Try identifier with context.packageName
+        var resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+        if (resId != 0) {
+            val v = context.getString(resId)
+            if (v.isNotBlank()) return v
+        }
+
+        // 2. Try identifier with project namespace "com.example"
+        resId = context.resources.getIdentifier("default_web_client_id", "string", "com.example")
+        if (resId != 0) {
+            val v = context.getString(resId)
+            if (v.isNotBlank()) return v
+        }
+
+        // 3. Try reflection on com.example.R$string
+        try {
+            val rClass = Class.forName("com.example.R\$string")
+            val field = rClass.getField("default_web_client_id")
+            val id = field.getInt(null)
+            if (id != 0) {
+                val v = context.getString(id)
+                if (v.isNotBlank()) return v
+            }
+        } catch (_: Throwable) {}
+
+        // 4. Try reflection on ${context.packageName}.R$string
+        try {
+            val rClass = Class.forName("${context.packageName}.R\$string")
+            val field = rClass.getField("default_web_client_id")
+            val id = field.getInt(null)
+            if (id != 0) {
+                val v = context.getString(id)
+                if (v.isNotBlank()) return v
+            }
+        } catch (_: Throwable) {}
+
+        return ""
+    }
+
+    suspend fun signInWithGoogle(webClientId: String = ""): FirebaseUser? {
+        val serverClientId = getWebClientId(webClientId)
 
         if (serverClientId.isBlank()) {
             throw IllegalStateException(
@@ -60,14 +120,10 @@ class GoogleAuthHelper(private val context: Context) {
             )
         }
 
-        val rawNonce = UUID.randomUUID().toString()
-        val hashedNonce = hashNonce(rawNonce)
-
         val googleIdOption = GetGoogleIdOption.Builder()
             .setFilterByAuthorizedAccounts(false)
             .setServerClientId(serverClientId)
             .setAutoSelectEnabled(false)
-            .setNonce(hashedNonce)
             .build()
 
         val request = GetCredentialRequest.Builder()
@@ -106,10 +162,17 @@ class GoogleAuthHelper(private val context: Context) {
                 }
         }
 
-    private fun hashNonce(rawNonce: String): String {
-        val md = MessageDigest.getInstance("SHA-256")
-        val digest = md.digest(rawNonce.toByteArray())
-        return digest.joinToString("") { "%02x".format(it) }
+    companion object {
+        /** Converts login exceptions into short messages a normal user can understand. */
+        fun friendlyError(e: Throwable): String = when (e) {
+            is androidx.credentials.exceptions.GetCredentialCancellationException ->
+                "Google sign-in cancelled"
+            is androidx.credentials.exceptions.NoCredentialException ->
+                "No Google account found on this phone. Add one in Settings > Accounts, then try again."
+            is androidx.credentials.exceptions.GetCredentialException ->
+                "Google sign-in failed (${e.type}). Check SHA-1 and google-services.json in Firebase."
+            else -> e.localizedMessage ?: "Google sign-in failed"
+        }
     }
 }
 

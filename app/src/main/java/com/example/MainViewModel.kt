@@ -1,11 +1,14 @@
 package com.example
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.example.data.model.*
 import com.example.data.repository.HimmatnagarRepository
+import com.example.data.supabase.SupabaseConfig
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 enum class ScreenState {
     ROLE_SELECTION,
@@ -16,25 +19,73 @@ enum class ScreenState {
     BUSINESS_PROFILE,
     CHAT,
     WORKER_DIRECTORY,
-    ADMIN_PANEL
+    OFFERS,
+    ADMIN_PANEL,
+    REEL_DETAIL
 }
 
 class MainViewModel(
-    val repository: HimmatnagarRepository = HimmatnagarRepository()
+    val repository: HimmatnagarRepository = HimmatnagarRepository.getInstance()
 ) : ViewModel() {
 
-    private val _currentScreen = MutableStateFlow(ScreenState.ROLE_SELECTION)
+    private val _currentScreen = MutableStateFlow(
+        if (repository.currentUser.value != null) ScreenState.MAIN_TABS else ScreenState.ROLE_SELECTION
+    )
     val currentScreen: StateFlow<ScreenState> = _currentScreen.asStateFlow()
 
-    // 0: Home, 1: Explore, 2: Reels, 3: Workers (Wrench icon), 4: Profile/Dashboard
+    // 0: Home, 1: Reels, 2: Workers, 3: Profile/Dashboard
     private val _selectedTab = MutableStateFlow(0)
     val selectedTab: StateFlow<Int> = _selectedTab.asStateFlow()
 
     private val _selectedBusiness = MutableStateFlow<Business?>(null)
     val selectedBusiness: StateFlow<Business?> = _selectedBusiness.asStateFlow()
 
+    private val _selectedReel = MutableStateFlow<Reel?>(null)
+    val selectedReel: StateFlow<Reel?> = _selectedReel.asStateFlow()
+
     private val _chatBusiness = MutableStateFlow<Business?>(null)
     val chatBusiness: StateFlow<Business?> = _chatBusiness.asStateFlow()
+
+    // UI Feedback States: Loading, Error, Offline
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage.asStateFlow()
+
+    private val _isOffline = MutableStateFlow(false)
+    val isOffline: StateFlow<Boolean> = _isOffline.asStateFlow()
+
+    init {
+        if (SupabaseConfig.isConfigured) {
+            viewModelScope.launch {
+                repository.refreshFromSupabase()
+            }
+        }
+    }
+
+    fun clearError() {
+        _errorMessage.value = null
+    }
+
+    fun setOffline(offline: Boolean) {
+        _isOffline.value = offline
+    }
+
+    fun retryConnection() {
+        _isLoading.value = true
+        _isOffline.value = false
+        _errorMessage.value = null
+        purgeExpiredReels()
+        if (SupabaseConfig.isConfigured) {
+            viewModelScope.launch {
+                repository.refreshFromSupabase()
+                _isLoading.value = false
+            }
+        } else {
+            _isLoading.value = false
+        }
+    }
 
     val currentUser = repository.currentUser
     val businesses = repository.businesses
@@ -79,12 +130,24 @@ class MainViewModel(
         }
     }
 
+    fun openOffersScreen() {
+        _currentScreen.value = ScreenState.OFFERS
+    }
+
+    fun openReelDetail(reelId: String) {
+        val r = repository.reels.value.find { it.id == reelId }
+        _selectedReel.value = r
+        _currentScreen.value = ScreenState.REEL_DETAIL
+    }
+
     fun handleBack() {
         when (_currentScreen.value) {
             ScreenState.BUSINESS_PROFILE,
             ScreenState.CHAT,
             ScreenState.WORKER_DIRECTORY,
-            ScreenState.ADMIN_PANEL -> {
+            ScreenState.OFFERS,
+            ScreenState.ADMIN_PANEL,
+            ScreenState.REEL_DETAIL -> {
                 _currentScreen.value = ScreenState.MAIN_TABS
             }
             ScreenState.CUSTOMER_AUTH,
@@ -104,9 +167,184 @@ class MainViewModel(
     }
 
     // Auth actions
+    fun registerCustomerWithGoogle(
+        firebaseUid: String,
+        googleName: String,
+        googleEmail: String,
+        enteredPhone: String,
+        enteredName: String,
+        firebaseIdToken: String = "",
+        avatarUrl: String? = null,
+        onComplete: ((Result<Unit>) -> Unit)? = null
+    ) {
+        val user = repository.loginOrRegisterCustomerWithGoogle(
+            firebaseUid = firebaseUid,
+            googleName = googleName,
+            googleEmail = googleEmail,
+            enteredPhone = enteredPhone,
+            enteredName = enteredName
+        )
+        if (firebaseIdToken.isNotBlank()) {
+            viewModelScope.launch {
+                val syncResult = repository.syncProfileWithEdgeFunction(
+                    firebaseIdToken = firebaseIdToken,
+                    role = "customer",
+                    name = user.name,
+                    phone = user.phone,
+                    email = user.email,
+                    avatarUrl = avatarUrl
+                )
+                if (syncResult.isSuccess) {
+                    _selectedTab.value = 0
+                    _currentScreen.value = ScreenState.MAIN_TABS
+                    onComplete?.invoke(Result.success(Unit))
+                } else {
+                    val ex = syncResult.exceptionOrNull() ?: Exception("Failed to sync customer profile")
+                    _errorMessage.value = ex.message
+                    onComplete?.invoke(Result.failure(ex))
+                }
+            }
+        } else {
+            _selectedTab.value = 0
+            _currentScreen.value = ScreenState.MAIN_TABS
+            onComplete?.invoke(Result.success(Unit))
+        }
+    }
+
+    fun registerOwnerWithGoogle(
+        firebaseUid: String,
+        googleName: String,
+        googleEmail: String,
+        enteredOwnerName: String,
+        enteredPhone: String,
+        shopName: String,
+        category: String,
+        area: String,
+        address: String,
+        whatsapp: String,
+        firebaseIdToken: String = "",
+        avatarUrl: String? = null,
+        onComplete: ((Result<Unit>) -> Unit)? = null
+    ) {
+        val (user, business) = repository.loginOrRegisterOwnerWithGoogle(
+            firebaseUid = firebaseUid,
+            googleName = googleName,
+            googleEmail = googleEmail,
+            enteredOwnerName = enteredOwnerName,
+            enteredPhone = enteredPhone,
+            shopName = shopName,
+            category = category,
+            area = area,
+            address = address,
+            whatsapp = whatsapp
+        )
+        if (business != null) {
+            _selectedBusiness.value = business
+        }
+        if (firebaseIdToken.isNotBlank()) {
+            viewModelScope.launch {
+                val syncResult = repository.syncProfileWithEdgeFunction(
+                    firebaseIdToken = firebaseIdToken,
+                    role = "owner",
+                    name = user.name,
+                    phone = user.phone,
+                    email = user.email,
+                    avatarUrl = avatarUrl
+                )
+                if (syncResult.isSuccess) {
+                    _selectedTab.value = 3 // Owner lands on Dashboard
+                    _currentScreen.value = ScreenState.MAIN_TABS
+                    onComplete?.invoke(Result.success(Unit))
+                } else {
+                    val ex = syncResult.exceptionOrNull() ?: Exception("Failed to sync owner profile")
+                    _errorMessage.value = ex.message
+                    onComplete?.invoke(Result.failure(ex))
+                }
+            }
+        } else {
+            _selectedTab.value = 3 // Owner lands on Dashboard
+            _currentScreen.value = ScreenState.MAIN_TABS
+            onComplete?.invoke(Result.success(Unit))
+        }
+    }
+
+    fun registerWorkerWithGoogle(
+        firebaseUid: String,
+        googleName: String,
+        googleEmail: String,
+        enteredName: String,
+        enteredPhone: String,
+        serviceType: String,
+        area: String,
+        exp: String,
+        photoUrl: String = "",
+        firebaseIdToken: String = "",
+        onComplete: ((Result<Unit>) -> Unit)? = null
+    ) {
+        val (user, worker) = repository.loginOrRegisterWorkerWithGoogle(
+            firebaseUid = firebaseUid,
+            googleName = googleName,
+            googleEmail = googleEmail,
+            enteredName = enteredName,
+            enteredPhone = enteredPhone,
+            serviceType = serviceType,
+            area = area,
+            exp = exp,
+            photoUrl = photoUrl
+        )
+        if (firebaseIdToken.isNotBlank()) {
+            viewModelScope.launch {
+                val syncResult = repository.syncProfileWithEdgeFunction(
+                    firebaseIdToken = firebaseIdToken,
+                    role = "worker",
+                    name = user.name,
+                    phone = user.phone,
+                    email = user.email,
+                    avatarUrl = if (photoUrl.isNotBlank()) photoUrl else null
+                )
+                if (syncResult.isSuccess) {
+                    _selectedTab.value = 3 // Worker lands on My Profile
+                    _currentScreen.value = ScreenState.MAIN_TABS
+                    onComplete?.invoke(Result.success(Unit))
+                } else {
+                    val ex = syncResult.exceptionOrNull() ?: Exception("Failed to sync worker profile")
+                    _errorMessage.value = ex.message
+                    onComplete?.invoke(Result.failure(ex))
+                }
+            }
+        } else {
+            _selectedTab.value = 3 // Worker lands on My Profile
+            _currentScreen.value = ScreenState.MAIN_TABS
+            onComplete?.invoke(Result.success(Unit))
+        }
+    }
+
+    fun loginExistingUserWithGoogle(
+        firebaseUid: String,
+        googleEmail: String,
+        googleName: String
+    ): Boolean {
+        val existing = repository.loginExistingUserWithGoogle(firebaseUid, googleEmail, googleName)
+        if (existing != null) {
+            when (existing.role) {
+                UserRole.OWNER -> _selectedTab.value = 3
+                UserRole.WORKER -> _selectedTab.value = 3
+                else -> _selectedTab.value = 0
+            }
+            _currentScreen.value = ScreenState.MAIN_TABS
+            return true
+        }
+        return false
+    }
+
+    fun updateUserPhone(newPhone: String) {
+        val uid = currentUser.value?.firebaseUid ?: currentUser.value?.id ?: return
+        repository.updateUserPhone(uid, newPhone)
+    }
+
     fun registerCustomer(name: String, phone: String) {
         repository.loginOrRegisterCustomer(name, phone)
-        _selectedTab.value = 0 // Customer lands on discovery feed
+        _selectedTab.value = 0
         _currentScreen.value = ScreenState.MAIN_TABS
     }
 
@@ -123,7 +361,7 @@ class MainViewModel(
             shopName, ownerName, phone, category, area, address, whatsapp
         )
         _selectedBusiness.value = newBusiness
-        _selectedTab.value = 4 // Owner lands on Business Dashboard
+        _selectedTab.value = 3
         _currentScreen.value = ScreenState.MAIN_TABS
     }
 
@@ -136,7 +374,7 @@ class MainViewModel(
         photoUrl: String = ""
     ) {
         repository.loginOrRegisterWorker(name, phone, serviceType, area, exp, photoUrl)
-        _selectedTab.value = 4 // Worker lands on Profile Tab to see their worker card (FIX 7)
+        _selectedTab.value = 3
         _currentScreen.value = ScreenState.MAIN_TABS
     }
 
@@ -154,16 +392,6 @@ class MainViewModel(
     fun continueAsGuest() {
         repository.setCurrentUser(null)
         _selectedTab.value = 0
-        _currentScreen.value = ScreenState.MAIN_TABS
-    }
-
-    fun switchRole(newRole: UserRole) {
-        repository.switchRoleForTesting(newRole)
-        when (newRole) {
-            UserRole.OWNER -> _selectedTab.value = 4 // Dashboard
-            UserRole.WORKER -> _selectedTab.value = 4 // Worker Profile
-            else -> _selectedTab.value = 0 // Discovery
-        }
         _currentScreen.value = ScreenState.MAIN_TABS
     }
 
@@ -186,12 +414,28 @@ class MainViewModel(
         repository.toggleLikeReel(reelId)
     }
 
-    // Owner actions
-    fun uploadReel(title: String, caption: String) {
-        val user = currentUser.value ?: return
-        if (user.role != UserRole.OWNER) return
-        val businessId = businesses.value.find { it.ownerId == user.id }?.id ?: return
-        repository.addReel(businessId, title, caption)
+    // Reel actions (Owner and Worker with monthly quota)
+    fun getRemainingReelQuota(uploaderId: String): Int {
+        return repository.getRemainingMonthlyReelQuota(uploaderId)
+    }
+
+    fun uploadReel(
+        title: String,
+        caption: String,
+        videoDurationSeconds: Int = 30,
+        fileSizeBytes: Long = 5_000_000L
+    ): ReelUploadResult {
+        val user = currentUser.value ?: return ReelUploadResult.Error("Please log in to upload a reel.")
+        if (user.role == UserRole.CUSTOMER) {
+            return ReelUploadResult.Error("Unauthorized: Customers are not permitted to upload reels.")
+        }
+        return repository.publishReel(
+            uploader = user,
+            title = title,
+            caption = caption,
+            videoDurationSeconds = videoDurationSeconds,
+            fileSizeBytes = fileSizeBytes
+        )
     }
 
     fun addOffer(

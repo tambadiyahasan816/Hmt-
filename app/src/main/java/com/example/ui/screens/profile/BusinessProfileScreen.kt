@@ -50,7 +50,7 @@ fun BusinessProfileScreen(
         offers.filter { it.businessId == business.id }
     }
     val businessReels = remember(reels, business.id) {
-        reels.filter { it.businessId == business.id }
+        reels.filter { it.businessId == business.id && !it.isExpired() }
     }
 
     Scaffold(
@@ -223,6 +223,53 @@ fun BusinessProfileScreen(
                             fontWeight = FontWeight.Bold,
                             color = BrandPrimary
                         )
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Business Contact Details Card (Form-entered phone, WhatsApp, Area, Address)
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                    ) {
+                        Column(modifier = Modifier.padding(10.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Phone, contentDescription = null, tint = BrandPrimary, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Phone: ${business.phone}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    modifier = Modifier.clickable { launchDialer(context, business.phone) }
+                                )
+                                if (business.whatsapp.isNotBlank()) {
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Icon(Icons.Default.Send, contentDescription = null, tint = WhatsAppGreen, modifier = Modifier.size(15.dp))
+                                    Spacer(modifier = Modifier.width(4.dp))
+                                    Text(
+                                        text = "WhatsApp: ${business.whatsapp}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = WhatsAppGreen,
+                                        modifier = Modifier.clickable { launchWhatsApp(context, business.whatsapp) }
+                                    )
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(Icons.Default.Place, contentDescription = null, tint = MaterialTheme.colorScheme.outline, modifier = Modifier.size(15.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Area: ${business.area} • ${business.address}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            }
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(14.dp))

@@ -48,7 +48,7 @@ fun AdminPanelScreen(
                 title = {
                     Column {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("Sheher Himmatnagar Admin", fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                            Text("HMT Admin", fontWeight = FontWeight.Bold, fontSize = 17.sp)
                             Spacer(modifier = Modifier.width(6.dp))
                             Box(
                                 modifier = Modifier
@@ -91,7 +91,7 @@ fun AdminPanelScreen(
                 }
             }
 
-            // Scheduled Auto-Delete Trigger Action
+            // Local Expired Reels Refresh (Server cleanup is executed hourly by pg_cron)
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
@@ -106,17 +106,17 @@ fun AdminPanelScreen(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("pg_cron Auto-Delete Trigger", fontWeight = FontWeight.Bold, fontSize = 13.sp)
-                            Text("Trigger Supabase Edge Function to purge reels expired > 10 days", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
+                            Text("Local Expired Reels Filter", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                            Text("Refreshes local list and hides reels older than 10 days. Real storage and DB cleanup is executed hourly by the server pg_cron job.", fontSize = 11.sp, color = MaterialTheme.colorScheme.outline)
                         }
                         Button(
                             onClick = {
                                 onPurgeExpiredReels()
-                                Toast.makeText(context, "Purge executed: All expired reels and videos removed!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Local cache refreshed. Expired reels hidden. Server cleanup runs hourly.", Toast.LENGTH_SHORT).show()
                             },
                             colors = ButtonDefaults.buttonColors(containerColor = BrandPrimary)
                         ) {
-                            Text("Run Cron", fontSize = 11.sp)
+                            Text("Refresh local expired reels", fontSize = 11.sp)
                         }
                     }
                 }
