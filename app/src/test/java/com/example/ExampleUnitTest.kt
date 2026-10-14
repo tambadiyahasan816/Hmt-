@@ -485,4 +485,11 @@ class ExampleUnitTest {
         val purgedSecondRun = repository.purgeExpiredReels(now)
         assertEquals("Second cleanup run must find 0 expired reels without error", 0, purgedSecondRun)
     }
+
+    @Test
+    fun supabase_is_configured_and_valid() {
+        assertTrue("SupabaseConfig.isConfigured must be true with configured values", com.example.data.supabase.SupabaseConfig.isConfigured)
+        assertFalse("Supabase URL must not be blank", com.example.data.supabase.SupabaseConfig.supabaseUrl.isBlank())
+        assertFalse("Supabase anon key must not be blank", com.example.data.supabase.SupabaseConfig.supabaseAnonKey.isBlank())
+    }
 }

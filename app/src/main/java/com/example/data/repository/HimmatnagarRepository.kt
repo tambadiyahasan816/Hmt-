@@ -4,15 +4,20 @@ import android.content.Context
 import com.example.data.local.LocalPreferences
 import com.example.data.model.*
 import com.example.data.supabase.SupabaseDataSource
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 import java.util.UUID
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 class HimmatnagarRepository(
     context: Context? = null,
-    val supabaseDataSource: SupabaseDataSource = SupabaseDataSource()
+    val supabaseDataSource: SupabaseDataSource = SupabaseDataSource(),
+    val isTesting: Boolean = false
 ) {
 
     private var localPrefs: LocalPreferences? = context?.let { LocalPreferences(it) }
@@ -50,9 +55,17 @@ class HimmatnagarRepository(
     // Monthly Reel Quota Tracker Ledger (Asia/Kolkata timezone, max 3 per month)
     private val _reelUploadUsage = mutableMapOf<String, Int>()
 
+    // Duplicate request prevention locks
+    private val _isSavingOffer = AtomicBoolean(false)
+    private val _isSavingBusiness = AtomicBoolean(false)
+    private val _isSavingWorker = AtomicBoolean(false)
+
     init {
-        seedInitialData()
         restorePersistedState()
+        // Production path: Do not load in-memory sample businesses/workers/offers when Supabase is configured
+        if (isTesting || !com.example.data.supabase.SupabaseConfig.isConfigured) {
+            seedInitialData()
+        }
     }
 
     private fun restorePersistedState() {
@@ -99,7 +112,7 @@ class HimmatnagarRepository(
         }
 
         fun createForTesting(): HimmatnagarRepository {
-            return HimmatnagarRepository(null)
+            return HimmatnagarRepository(null, isTesting = true)
         }
     }
 
@@ -660,6 +673,29 @@ class HimmatnagarRepository(
         )
         _businesses.value = listOf(newBusiness) + _businesses.value
         _businessViews.value = _businessViews.value + (newBusiness.id to 0)
+
+        if (com.example.data.supabase.SupabaseConfig.isConfigured && !isTesting) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val req = com.example.data.supabase.CreateBusinessRequest(
+                        ownerId = cleanUid,
+                        name = cleanShop,
+                        category = cleanCat,
+                        phone = cleanPhone,
+                        whatsapp = cleanWa,
+                        area = cleanArea,
+                        address = if (cleanAddr.isNotBlank()) cleanAddr else "$cleanArea, Himmatnagar",
+                        lat = HimmatnagarLocations.CENTER_LAT,
+                        lng = HimmatnagarLocations.CENTER_LNG,
+                        bio = "Official store in $cleanArea, Himmatnagar."
+                    )
+                    val res = supabaseDataSource.createBusiness(req)
+                    if (res.isSuccess) {
+                        refreshBusinesses()
+                    }
+                } catch (_: Exception) {}
+            }
+        }
         return Pair(newUser, newBusiness)
     }
 
@@ -731,6 +767,26 @@ class HimmatnagarRepository(
             createdBy = "Registered Worker"
         )
         _workers.value = listOf(newWorker) + _workers.value
+
+        if (com.example.data.supabase.SupabaseConfig.isConfigured && !isTesting) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val req = com.example.data.supabase.CreateWorkerRequest(
+                        profileId = cleanUid,
+                        name = cleanWorkerName,
+                        serviceType = cleanService,
+                        phone = cleanPhone,
+                        area = cleanArea,
+                        experienceYears = if (cleanExp.isNotBlank()) cleanExp else "Experienced",
+                        photoUrl = if (photoUrl.isNotBlank()) photoUrl.trim() else null
+                    )
+                    val res = supabaseDataSource.createWorker(req)
+                    if (res.isSuccess) {
+                        refreshWorkers()
+                    }
+                } catch (_: Exception) {}
+            }
+        }
         return Pair(newUser, newWorker)
     }
 
@@ -1125,28 +1181,88 @@ class HimmatnagarRepository(
         if (trimmedProduct.isBlank() || trimmedCategory.isBlank() || trimmedValidUntil.isBlank()) return false
         if (originalPrice <= 0.0 || discountedPrice <= 0.0 || discountedPrice >= originalPrice) return false
 
-        val business = _businesses.value.find { it.id == businessId } ?: return false
-        val discountPercent = (((originalPrice - discountedPrice) / originalPrice) * 100).toInt().coerceIn(1, 99)
+        val user = _currentUser.value
+        if (user != null && user.role == UserRole.CUSTOMER) {
+            return false
+        }
 
-        val newOffer = Offer(
-            id = "off_${UUID.randomUUID().toString().take(8)}",
-            businessId = business.id,
-            businessName = business.name,
-            area = business.area,
-            productName = trimmedProduct,
-            category = trimmedCategory,
-            originalPrice = originalPrice,
-            discountedPrice = discountedPrice,
-            discountPercent = discountPercent,
-            couponCode = trimmedCode,
-            validUntil = trimmedValidUntil
-        )
-        _offers.value = listOf(newOffer) + _offers.value
-        return true
+        val business = _businesses.value.find { it.id == businessId }
+        if (user != null && user.role == UserRole.OWNER && business != null) {
+            val isOwner = business.ownerId == user.id || business.ownerId == user.firebaseUid
+            if (!isOwner) return false
+        }
+
+        if (!_isSavingOffer.compareAndSet(false, true)) {
+            return false
+        }
+
+        try {
+            val discountPercent = (((originalPrice - discountedPrice) / originalPrice) * 100).toInt().coerceIn(1, 99)
+            val newOffer = Offer(
+                id = "off_${UUID.randomUUID().toString().take(8)}",
+                businessId = business?.id ?: businessId,
+                businessName = business?.name ?: "",
+                area = business?.area ?: "",
+                productName = trimmedProduct,
+                category = trimmedCategory,
+                originalPrice = originalPrice,
+                discountedPrice = discountedPrice,
+                discountPercent = discountPercent,
+                couponCode = trimmedCode,
+                validUntil = trimmedValidUntil
+            )
+            _offers.value = listOf(newOffer) + _offers.value
+
+            if (com.example.data.supabase.SupabaseConfig.isConfigured && !isTesting) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val req = com.example.data.supabase.CreateOfferRequest(
+                            businessId = business?.id ?: businessId,
+                            productName = trimmedProduct,
+                            originalPrice = originalPrice,
+                            discountedPrice = discountedPrice,
+                            discountPercent = discountPercent,
+                            couponCode = trimmedCode,
+                            validUntil = trimmedValidUntil
+                        )
+                        val res = supabaseDataSource.createOffer(req)
+                        if (res.isSuccess) {
+                            refreshOffers()
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+            return true
+        } finally {
+            _isSavingOffer.set(false)
+        }
     }
 
-    fun deleteOffer(offerId: String) {
+    fun deleteOffer(offerId: String): Boolean {
+        val user = _currentUser.value
+        if (user != null && user.role == UserRole.CUSTOMER) {
+            return false
+        }
+        val offer = _offers.value.find { it.id == offerId } ?: return false
+        val business = _businesses.value.find { it.id == offer.businessId }
+        if (user != null && user.role == UserRole.OWNER && business != null) {
+            val isOwner = business.ownerId == user.id || business.ownerId == user.firebaseUid
+            if (!isOwner) return false
+        }
+
         _offers.value = _offers.value.filter { it.id != offerId }
+
+        if (com.example.data.supabase.SupabaseConfig.isConfigured && !isTesting) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val res = supabaseDataSource.deleteOffer(offerId)
+                    if (res.isSuccess) {
+                        refreshOffers()
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        return true
     }
 
     fun updateBusinessDetails(
@@ -1155,21 +1271,57 @@ class HimmatnagarRepository(
         phone: String,
         whatsapp: String,
         address: String
-    ) {
-        val trimmedBio = bio.trim()
-        val trimmedPhone = phone.trim()
-        val trimmedWa = whatsapp.trim()
-        val trimmedAddr = address.trim()
+    ): Boolean {
+        val user = _currentUser.value
+        if (user != null && user.role == UserRole.CUSTOMER) {
+            return false
+        }
+        val business = _businesses.value.find { it.id == businessId } ?: return false
+        if (user != null && user.role == UserRole.OWNER) {
+            val isOwner = business.ownerId == user.id || business.ownerId == user.firebaseUid
+            if (!isOwner) return false
+        }
 
-        _businesses.value = _businesses.value.map {
-            if (it.id == businessId) {
-                it.copy(
-                    bio = trimmedBio,
-                    phone = trimmedPhone,
-                    whatsapp = trimmedWa,
-                    address = trimmedAddr
-                )
-            } else it
+        if (!_isSavingBusiness.compareAndSet(false, true)) {
+            return false
+        }
+
+        try {
+            val trimmedBio = bio.trim()
+            val trimmedPhone = phone.trim()
+            val trimmedWa = whatsapp.trim()
+            val trimmedAddr = address.trim()
+
+            _businesses.value = _businesses.value.map {
+                if (it.id == businessId) {
+                    it.copy(
+                        bio = trimmedBio,
+                        phone = trimmedPhone,
+                        whatsapp = trimmedWa,
+                        address = trimmedAddr
+                    )
+                } else it
+            }
+
+            if (com.example.data.supabase.SupabaseConfig.isConfigured && !isTesting) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val req = com.example.data.supabase.UpdateBusinessRequest(
+                            bio = trimmedBio,
+                            phone = trimmedPhone,
+                            whatsapp = trimmedWa,
+                            address = trimmedAddr
+                        )
+                        val res = supabaseDataSource.updateBusiness(businessId, req)
+                        if (res.isSuccess) {
+                            refreshBusinesses()
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+            return true
+        } finally {
+            _isSavingBusiness.set(false)
         }
     }
 
@@ -1180,7 +1332,17 @@ class HimmatnagarRepository(
         phone: String,
         area: String,
         experienceYears: String
-    ) {
+    ): Boolean {
+        val user = _currentUser.value
+        if (user != null && user.role == UserRole.CUSTOMER) {
+            return false
+        }
+        val worker = _workers.value.find { it.id == workerId || it.profileId == workerId } ?: return false
+        if (user != null && user.role == UserRole.WORKER) {
+            val isSelf = worker.profileId == user.id || worker.profileId == user.firebaseUid || worker.id == user.id
+            if (!isSelf) return false
+        }
+
         val trimmedName = name.trim()
         val trimmedService = serviceType.trim()
         val trimmedPhone = phone.trim()
@@ -1188,7 +1350,7 @@ class HimmatnagarRepository(
         val trimmedExp = experienceYears.trim()
 
         if (trimmedName.isBlank() || trimmedService.isBlank() || trimmedPhone.isBlank() || trimmedArea.isBlank()) {
-            return
+            return false
         }
 
         _workers.value = _workers.value.map {
@@ -1205,6 +1367,25 @@ class HimmatnagarRepository(
         _currentUser.value = _currentUser.value?.copy(name = trimmedName, phone = trimmedPhone).also {
             localPrefs?.saveCurrentUser(it)
         }
+
+        if (com.example.data.supabase.SupabaseConfig.isConfigured && !isTesting) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val req = com.example.data.supabase.UpdateWorkerRequest(
+                        name = trimmedName,
+                        serviceType = trimmedService,
+                        phone = trimmedPhone,
+                        area = trimmedArea,
+                        experienceYears = trimmedExp
+                    )
+                    val res = supabaseDataSource.updateWorker(worker.id, req)
+                    if (res.isSuccess) {
+                        refreshWorkers()
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        return true
     }
 
     // Worker Directory Actions
@@ -1215,6 +1396,10 @@ class HimmatnagarRepository(
         area: String,
         exp: String
     ): Boolean {
+        val user = _currentUser.value
+        if (user != null && user.role == UserRole.CUSTOMER) {
+            return false
+        }
         val trimmedName = name.trim()
         val trimmedService = serviceType.trim()
         val trimmedPhone = phone.trim()
@@ -1225,20 +1410,47 @@ class HimmatnagarRepository(
             return false
         }
 
-        val newWorker = Worker(
-            id = "w_${UUID.randomUUID().toString().take(8)}",
-            profileId = "",
-            name = trimmedName,
-            serviceType = trimmedService,
-            phone = trimmedPhone,
-            whatsapp = trimmedPhone,
-            area = trimmedArea,
-            experienceYears = if (trimmedExp.isNotBlank()) trimmedExp else "Experienced",
-            rating = 0f,
-            createdBy = "Community"
-        )
-        _workers.value = listOf(newWorker) + _workers.value
-        return true
+        if (!_isSavingWorker.compareAndSet(false, true)) {
+            return false
+        }
+
+        try {
+            val newWorker = Worker(
+                id = "w_${UUID.randomUUID().toString().take(8)}",
+                profileId = user?.firebaseUid ?: user?.id ?: "",
+                name = trimmedName,
+                serviceType = trimmedService,
+                phone = trimmedPhone,
+                whatsapp = trimmedPhone,
+                area = trimmedArea,
+                experienceYears = if (trimmedExp.isNotBlank()) trimmedExp else "Experienced",
+                rating = 0f,
+                createdBy = user?.name ?: "Community"
+            )
+            _workers.value = listOf(newWorker) + _workers.value
+
+            if (com.example.data.supabase.SupabaseConfig.isConfigured && !isTesting) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    try {
+                        val req = com.example.data.supabase.CreateWorkerRequest(
+                            profileId = user?.firebaseUid ?: user?.id,
+                            name = trimmedName,
+                            serviceType = trimmedService,
+                            phone = trimmedPhone,
+                            area = trimmedArea,
+                            experienceYears = trimmedExp
+                        )
+                        val res = supabaseDataSource.createWorker(req)
+                        if (res.isSuccess) {
+                            refreshWorkers()
+                        }
+                    } catch (_: Exception) {}
+                }
+            }
+            return true
+        } finally {
+            _isSavingWorker.set(false)
+        }
     }
 
     // Chat Actions
@@ -1283,11 +1495,85 @@ class HimmatnagarRepository(
         localPrefs?.saveFollowedBusinesses(updatedFollows)
         _businessViews.value = _businessViews.value - businessId
         _chatMessages.value = _chatMessages.value.filter { it.businessId != businessId }
+
+        if (com.example.data.supabase.SupabaseConfig.isConfigured && !isTesting) {
+            CoroutineScope(Dispatchers.IO).launch {
+                try {
+                    val res = supabaseDataSource.deleteBusiness(businessId)
+                    if (res.isSuccess) {
+                        refreshBusinesses()
+                        refreshOffers()
+                    }
+                } catch (_: Exception) {}
+            }
+        }
     }
 
     // =========================================================================
-    // Supabase Public Data-Source Layer (Read-Only)
+    // Supabase Public Data-Source Layer & Refresh
     // =========================================================================
+
+    suspend fun refreshBusinesses(): Result<List<Business>> = runCatching {
+        val remoteBusinesses = supabaseDataSource.fetchPublicBusinesses().getOrThrow()
+        val existingMap = _businesses.value.associateBy { it.id }
+        val merged = remoteBusinesses.map { rb ->
+            val local = existingMap[rb.id]
+            if (local != null) {
+                rb.copy(
+                    followerCount = local.followerCount,
+                    rating = local.rating,
+                    reviewCount = local.reviewCount
+                )
+            } else rb
+        }
+        _businesses.value = merged
+        merged
+    }
+
+    suspend fun refreshWorkers(): Result<List<Worker>> = runCatching {
+        val remoteWorkers = supabaseDataSource.fetchPublicWorkers().getOrThrow()
+        _workers.value = remoteWorkers
+        remoteWorkers
+    }
+
+    suspend fun refreshOffers(): Result<List<Offer>> = runCatching {
+        val remoteOffers = supabaseDataSource.fetchPublicOffers().getOrThrow()
+        val businessMap = _businesses.value.associateBy { it.id }
+        val mapped = remoteOffers.map { ro ->
+            if (ro.businessName.isBlank()) {
+                val b = businessMap[ro.businessId]
+                ro.copy(
+                    businessName = b?.name ?: "",
+                    area = b?.area ?: "",
+                    category = b?.category ?: ""
+                )
+            } else ro
+        }
+        _offers.value = mapped
+        mapped
+    }
+
+    fun updateUserFromSync(response: com.example.data.supabase.SyncProfileResponse?): UserProfile? {
+        if (response == null || !response.success) return null
+        val current = _currentUser.value ?: return null
+        val updated = current.copy(
+            id = response.userId ?: current.id,
+            name = response.name ?: current.name,
+            phone = response.phone ?: current.phone,
+            email = response.email ?: current.email,
+            role = response.role?.let { r ->
+                try { UserRole.valueOf(r.uppercase()) } catch (_: Exception) { null }
+            } ?: current.role,
+            updatedAt = System.currentTimeMillis()
+        )
+        _currentUser.value = updated
+        _registeredUsers.value = _registeredUsers.value.map {
+            if (it.firebaseUid == current.firebaseUid || it.id == current.id) updated else it
+        }
+        localPrefs?.saveCurrentUser(updated)
+        localPrefs?.saveRegisteredUsers(_registeredUsers.value)
+        return updated
+    }
 
     suspend fun refreshFromSupabase(): Result<Unit> = runCatching {
         // 1. Fetch public businesses

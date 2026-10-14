@@ -17,14 +17,21 @@ object SupabaseConfig {
 
     val supabaseUrl: String
         get() = try {
-            BuildConfig.SUPABASE_URL.trim()
+            val raw = BuildConfig.SUPABASE_URL.trim().removeSurrounding("\"")
+            if (raw.endsWith("/rest/v1/")) {
+                raw.removeSuffix("rest/v1/")
+            } else if (raw.endsWith("/rest/v1")) {
+                raw.removeSuffix("rest/v1")
+            } else {
+                raw
+            }
         } catch (e: Throwable) {
             ""
         }
 
     val supabaseAnonKey: String
         get() = try {
-            BuildConfig.SUPABASE_ANON_KEY.trim()
+            BuildConfig.SUPABASE_ANON_KEY.trim().removeSurrounding("\"")
         } catch (e: Throwable) {
             ""
         }
@@ -33,7 +40,7 @@ object SupabaseConfig {
 
     val syncProfileUrl: String
         get() = try {
-            val fromConfig = BuildConfig.SUPABASE_SYNC_PROFILE_URL.trim()
+            val fromConfig = BuildConfig.SUPABASE_SYNC_PROFILE_URL.trim().removeSurrounding("\"")
             if (fromConfig.isNotBlank()) fromConfig else DEFAULT_SYNC_PROFILE_ENDPOINT
         } catch (e: Throwable) {
             DEFAULT_SYNC_PROFILE_ENDPOINT

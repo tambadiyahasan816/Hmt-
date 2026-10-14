@@ -92,6 +92,7 @@ fun HMTApp(viewModel: MainViewModel) {
     val chatMessages by viewModel.chatMessages.collectAsStateWithLifecycle()
     val isOffline by viewModel.isOffline.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
+    val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
 
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -108,6 +109,14 @@ fun HMTApp(viewModel: MainViewModel) {
             .fillMaxSize()
             .imePadding()
     ) {
+        if (isLoading) {
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("loading_progress_bar"),
+                color = BrandPrimary
+            )
+        }
         if (isOffline) {
             Surface(
                 color = Color(0xFFF59E0B),
@@ -136,6 +145,9 @@ fun HMTApp(viewModel: MainViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(error, color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { viewModel.retryConnection() }) {
+                        Text("Retry", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
                     IconButton(onClick = { viewModel.clearError() }, modifier = Modifier.size(20.dp)) {
                         Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = Color.White, modifier = Modifier.size(14.dp))
                     }
@@ -151,8 +163,8 @@ fun HMTApp(viewModel: MainViewModel) {
                 onSelectOwner = { viewModel.navigateTo(ScreenState.OWNER_AUTH) },
                 onSelectWorker = { viewModel.navigateTo(ScreenState.WORKER_AUTH) },
                 onContinueAsGuest = { viewModel.continueAsGuest() },
-                onGoogleSignInSuccess = { uid, gName, gEmail ->
-                    val loggedIn = viewModel.loginExistingUserWithGoogle(uid, gEmail, gName)
+                onGoogleSignInSuccess = { uid, gName, gEmail, idToken ->
+                    val loggedIn = viewModel.loginExistingUserWithGoogle(uid, gEmail, gName, idToken)
                     if (loggedIn) {
                         android.widget.Toast.makeText(context, "Welcome back, $gName!", android.widget.Toast.LENGTH_SHORT).show()
                     } else {

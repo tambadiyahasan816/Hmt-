@@ -97,3 +97,60 @@ data class SyncProfileResponse(
     @Json(name = "error") val error: String? = null
 )
 
+@JsonClass(generateAdapter = true)
+data class CreateBusinessRequest(
+    @Json(name = "owner_id") val ownerId: String,
+    @Json(name = "name") val name: String,
+    @Json(name = "category") val category: String,
+    @Json(name = "phone") val phone: String,
+    @Json(name = "whatsapp") val whatsapp: String,
+    @Json(name = "area") val area: String,
+    @Json(name = "address") val address: String,
+    @Json(name = "lat") val lat: Double = 23.5977,
+    @Json(name = "lng") val lng: Double = 72.9667,
+    @Json(name = "bio") val bio: String? = null,
+    @Json(name = "image_url") val imageUrl: String? = null,
+    @Json(name = "cover_url") val coverUrl: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class UpdateBusinessRequest(
+    @Json(name = "bio") val bio: String? = null,
+    @Json(name = "phone") val phone: String? = null,
+    @Json(name = "whatsapp") val whatsapp: String? = null,
+    @Json(name = "address") val address: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class CreateWorkerRequest(
+    @Json(name = "profile_id") val profileId: String? = null,
+    @Json(name = "name") val name: String,
+    @Json(name = "service_type") val serviceType: String,
+    @Json(name = "phone") val phone: String,
+    @Json(name = "area") val area: String,
+    @Json(name = "experience_years") val experienceYears: String? = null,
+    @Json(name = "photo_url") val photoUrl: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class UpdateWorkerRequest(
+    @Json(name = "name") val name: String? = null,
+    @Json(name = "service_type") val serviceType: String? = null,
+    @Json(name = "phone") val phone: String? = null,
+    @Json(name = "area") val area: String? = null,
+    @Json(name = "experience_years") val experienceYears: String? = null
+)
+
+@JsonClass(generateAdapter = true)
+data class CreateOfferRequest(
+    @Json(name = "business_id") val businessId: String,
+    @Json(name = "product_name") val productName: String,
+    @Json(name = "original_price") val originalPrice: Double,
+    @Json(name = "discounted_price") val discountedPrice: Double,
+    @Json(name = "discount_percent") val discountPercent: Int,
+    @Json(name = "coupon_code") val couponCode: String,
+    @Json(name = "valid_until") val validUntil: String,
+    @Json(name = "image_url") val imageUrl: String? = null
+)
+
+

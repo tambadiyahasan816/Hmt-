@@ -164,6 +164,120 @@ class SupabaseDataSource(
         }
     }
 
+    suspend fun createBusiness(request: CreateBusinessRequest): Result<Business> = runCatching {
+        val service = restService ?: throw IllegalStateException("Supabase client is not configured")
+        val created = service.createBusiness(request).firstOrNull()
+            ?: throw IllegalStateException("Empty response when creating business")
+        Business(
+            id = created.id,
+            ownerId = created.ownerId,
+            name = created.name,
+            category = created.category,
+            phone = created.phone,
+            whatsapp = created.whatsapp,
+            area = created.area,
+            address = created.address,
+            lat = created.lat,
+            lng = created.lng,
+            bio = created.bio ?: "",
+            imageUrl = created.imageUrl ?: "",
+            coverUrl = created.coverUrl ?: "",
+            isApproved = created.isApproved
+        )
+    }
+
+    suspend fun updateBusiness(businessId: String, request: UpdateBusinessRequest): Result<Business> = runCatching {
+        val service = restService ?: throw IllegalStateException("Supabase client is not configured")
+        val updated = service.updateBusiness("eq.$businessId", request).firstOrNull()
+            ?: throw IllegalStateException("Empty response when updating business")
+        Business(
+            id = updated.id,
+            ownerId = updated.ownerId,
+            name = updated.name,
+            category = updated.category,
+            phone = updated.phone,
+            whatsapp = updated.whatsapp,
+            area = updated.area,
+            address = updated.address,
+            lat = updated.lat,
+            lng = updated.lng,
+            bio = updated.bio ?: "",
+            imageUrl = updated.imageUrl ?: "",
+            coverUrl = updated.coverUrl ?: "",
+            isApproved = updated.isApproved
+        )
+    }
+
+    suspend fun deleteBusiness(businessId: String): Result<Unit> = runCatching {
+        val service = restService ?: throw IllegalStateException("Supabase client is not configured")
+        val response = service.deleteBusiness("eq.$businessId")
+        if (!response.isSuccessful) {
+            throw IllegalStateException("Failed to delete business: HTTP ${response.code()}")
+        }
+    }
+
+    suspend fun createWorker(request: CreateWorkerRequest): Result<Worker> = runCatching {
+        val service = restService ?: throw IllegalStateException("Supabase client is not configured")
+        val created = service.createWorker(request).firstOrNull()
+            ?: throw IllegalStateException("Empty response when creating worker")
+        Worker(
+            id = created.id,
+            profileId = created.profileId ?: "",
+            name = created.name,
+            serviceType = created.serviceType,
+            phone = created.phone,
+            area = created.area,
+            experienceYears = created.experienceYears ?: "",
+            photoUrl = created.photoUrl ?: "",
+            rating = (created.rating ?: 0.0).toFloat()
+        )
+    }
+
+    suspend fun updateWorker(workerId: String, request: UpdateWorkerRequest): Result<Worker> = runCatching {
+        val service = restService ?: throw IllegalStateException("Supabase client is not configured")
+        val updated = service.updateWorker("eq.$workerId", request).firstOrNull()
+            ?: throw IllegalStateException("Empty response when updating worker")
+        Worker(
+            id = updated.id,
+            profileId = updated.profileId ?: "",
+            name = updated.name,
+            serviceType = updated.serviceType,
+            phone = updated.phone,
+            area = updated.area,
+            experienceYears = updated.experienceYears ?: "",
+            photoUrl = updated.photoUrl ?: "",
+            rating = (updated.rating ?: 0.0).toFloat()
+        )
+    }
+
+    suspend fun createOffer(request: CreateOfferRequest): Result<Offer> = runCatching {
+        val service = restService ?: throw IllegalStateException("Supabase client is not configured")
+        val created = service.createOffer(request).firstOrNull()
+            ?: throw IllegalStateException("Empty response when creating offer")
+        Offer(
+            id = created.id,
+            businessId = created.businessId,
+            businessName = "",
+            area = "",
+            productName = created.productName,
+            category = "",
+            originalPrice = created.originalPrice,
+            discountedPrice = created.discountedPrice,
+            discountPercent = created.discountPercent,
+            couponCode = created.couponCode,
+            validUntil = created.validUntil,
+            imageUrl = created.imageUrl ?: ""
+        )
+    }
+
+    suspend fun deleteOffer(offerId: String): Result<Unit> = runCatching {
+        val service = restService ?: throw IllegalStateException("Supabase client is not configured")
+        val response = service.deleteOffer("eq.$offerId")
+        if (!response.isSuccessful) {
+            throw IllegalStateException("Failed to delete offer: HTTP ${response.code()}")
+        }
+    }
+
     private fun parseIsoTimestamp(isoString: String?): Long? {
         if (isoString.isNullOrBlank()) return null
         return try {

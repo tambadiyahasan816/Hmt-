@@ -59,7 +59,18 @@ class MainViewModel(
     init {
         if (SupabaseConfig.isConfigured) {
             viewModelScope.launch {
-                repository.refreshFromSupabase()
+                _isLoading.value = true
+                try {
+                    val res = repository.refreshFromSupabase()
+                    if (res.isFailure) {
+                        val msg = res.exceptionOrNull()?.message ?: "Failed to connect to Supabase"
+                        _errorMessage.value = msg
+                    }
+                } catch (e: Exception) {
+                    _errorMessage.value = e.message ?: "Failed to load data from Supabase"
+                } finally {
+                    _isLoading.value = false
+                }
             }
         }
     }
@@ -79,8 +90,17 @@ class MainViewModel(
         purgeExpiredReels()
         if (SupabaseConfig.isConfigured) {
             viewModelScope.launch {
-                repository.refreshFromSupabase()
-                _isLoading.value = false
+                try {
+                    val res = repository.refreshFromSupabase()
+                    if (res.isFailure) {
+                        val msg = res.exceptionOrNull()?.message ?: "Failed to refresh data"
+                        _errorMessage.value = msg
+                    }
+                } catch (e: Exception) {
+                    _errorMessage.value = e.message ?: "Network error"
+                } finally {
+                    _isLoading.value = false
+                }
             }
         } else {
             _isLoading.value = false
@@ -195,16 +215,29 @@ class MainViewModel(
                     avatarUrl = avatarUrl
                 )
                 if (syncResult.isSuccess) {
+                    repository.updateUserFromSync(syncResult.getOrNull())
+                    if (SupabaseConfig.isConfigured) {
+                        repository.refreshFromSupabase()
+                    }
                     _selectedTab.value = 0
                     _currentScreen.value = ScreenState.MAIN_TABS
                     onComplete?.invoke(Result.success(Unit))
                 } else {
                     val ex = syncResult.exceptionOrNull() ?: Exception("Failed to sync customer profile")
-                    _errorMessage.value = ex.message
-                    onComplete?.invoke(Result.failure(ex))
+                    val rawMsg = ex.message ?: "Authentication sync failed"
+                    val userMsg = if (rawMsg.contains("expired", ignoreCase = true) || rawMsg.contains("token", ignoreCase = true) || rawMsg.contains("401")) {
+                        "Your login session has expired. Please sign in again with Google."
+                    } else {
+                        rawMsg
+                    }
+                    _errorMessage.value = userMsg
+                    onComplete?.invoke(Result.failure(Exception(userMsg)))
                 }
             }
         } else {
+            if (SupabaseConfig.isConfigured) {
+                viewModelScope.launch { repository.refreshFromSupabase() }
+            }
             _selectedTab.value = 0
             _currentScreen.value = ScreenState.MAIN_TABS
             onComplete?.invoke(Result.success(Unit))
@@ -252,16 +285,29 @@ class MainViewModel(
                     avatarUrl = avatarUrl
                 )
                 if (syncResult.isSuccess) {
+                    repository.updateUserFromSync(syncResult.getOrNull())
+                    if (SupabaseConfig.isConfigured) {
+                        repository.refreshFromSupabase()
+                    }
                     _selectedTab.value = 3 // Owner lands on Dashboard
                     _currentScreen.value = ScreenState.MAIN_TABS
                     onComplete?.invoke(Result.success(Unit))
                 } else {
                     val ex = syncResult.exceptionOrNull() ?: Exception("Failed to sync owner profile")
-                    _errorMessage.value = ex.message
-                    onComplete?.invoke(Result.failure(ex))
+                    val rawMsg = ex.message ?: "Authentication sync failed"
+                    val userMsg = if (rawMsg.contains("expired", ignoreCase = true) || rawMsg.contains("token", ignoreCase = true) || rawMsg.contains("401")) {
+                        "Your login session has expired. Please sign in again with Google."
+                    } else {
+                        rawMsg
+                    }
+                    _errorMessage.value = userMsg
+                    onComplete?.invoke(Result.failure(Exception(userMsg)))
                 }
             }
         } else {
+            if (SupabaseConfig.isConfigured) {
+                viewModelScope.launch { repository.refreshFromSupabase() }
+            }
             _selectedTab.value = 3 // Owner lands on Dashboard
             _currentScreen.value = ScreenState.MAIN_TABS
             onComplete?.invoke(Result.success(Unit))
@@ -303,16 +349,29 @@ class MainViewModel(
                     avatarUrl = if (photoUrl.isNotBlank()) photoUrl else null
                 )
                 if (syncResult.isSuccess) {
+                    repository.updateUserFromSync(syncResult.getOrNull())
+                    if (SupabaseConfig.isConfigured) {
+                        repository.refreshFromSupabase()
+                    }
                     _selectedTab.value = 3 // Worker lands on My Profile
                     _currentScreen.value = ScreenState.MAIN_TABS
                     onComplete?.invoke(Result.success(Unit))
                 } else {
                     val ex = syncResult.exceptionOrNull() ?: Exception("Failed to sync worker profile")
-                    _errorMessage.value = ex.message
-                    onComplete?.invoke(Result.failure(ex))
+                    val rawMsg = ex.message ?: "Authentication sync failed"
+                    val userMsg = if (rawMsg.contains("expired", ignoreCase = true) || rawMsg.contains("token", ignoreCase = true) || rawMsg.contains("401")) {
+                        "Your login session has expired. Please sign in again with Google."
+                    } else {
+                        rawMsg
+                    }
+                    _errorMessage.value = userMsg
+                    onComplete?.invoke(Result.failure(Exception(userMsg)))
                 }
             }
         } else {
+            if (SupabaseConfig.isConfigured) {
+                viewModelScope.launch { repository.refreshFromSupabase() }
+            }
             _selectedTab.value = 3 // Worker lands on My Profile
             _currentScreen.value = ScreenState.MAIN_TABS
             onComplete?.invoke(Result.success(Unit))
@@ -322,7 +381,8 @@ class MainViewModel(
     fun loginExistingUserWithGoogle(
         firebaseUid: String,
         googleEmail: String,
-        googleName: String
+        googleName: String,
+        firebaseIdToken: String = ""
     ): Boolean {
         val existing = repository.loginExistingUserWithGoogle(firebaseUid, googleEmail, googleName)
         if (existing != null) {
@@ -332,6 +392,34 @@ class MainViewModel(
                 else -> _selectedTab.value = 0
             }
             _currentScreen.value = ScreenState.MAIN_TABS
+
+            if (firebaseIdToken.isNotBlank()) {
+                viewModelScope.launch {
+                    val roleStr = when (existing.role) {
+                        UserRole.OWNER -> "owner"
+                        UserRole.WORKER -> "worker"
+                        UserRole.ADMIN -> "admin"
+                        else -> "customer"
+                    }
+                    val syncResult = repository.syncProfileWithEdgeFunction(
+                        firebaseIdToken = firebaseIdToken,
+                        role = roleStr,
+                        name = existing.name,
+                        phone = existing.phone,
+                        email = existing.email
+                    )
+                    if (syncResult.isSuccess) {
+                        repository.updateUserFromSync(syncResult.getOrNull())
+                    }
+                    if (SupabaseConfig.isConfigured) {
+                        repository.refreshFromSupabase()
+                    }
+                }
+            } else if (SupabaseConfig.isConfigured) {
+                viewModelScope.launch {
+                    repository.refreshFromSupabase()
+                }
+            }
             return true
         }
         return false

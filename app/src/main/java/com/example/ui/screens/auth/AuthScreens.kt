@@ -45,7 +45,7 @@ fun RoleSelectionScreen(
     onSelectOwner: () -> Unit,
     onSelectWorker: () -> Unit,
     onContinueAsGuest: () -> Unit,
-    onGoogleSignInSuccess: ((firebaseUid: String, googleName: String, googleEmail: String) -> Unit)? = null
+    onGoogleSignInSuccess: ((firebaseUid: String, googleName: String, googleEmail: String, idToken: String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -328,7 +328,12 @@ fun RoleSelectionScreen(
                                     val gName = user.displayName ?: "Google User"
                                     val gEmail = user.email ?: ""
                                     val uid = user.uid
-                                    onGoogleSignInSuccess?.invoke(uid, gName, gEmail)
+                                    val idToken = try {
+                                        authHelper.getFirebaseIdToken()
+                                    } catch (_: Exception) {
+                                        ""
+                                    }
+                                    onGoogleSignInSuccess?.invoke(uid, gName, gEmail, idToken)
                                 }
                             } catch (e: Exception) {
                                 Toast.makeText(

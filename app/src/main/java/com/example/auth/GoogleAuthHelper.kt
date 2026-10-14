@@ -108,7 +108,7 @@ class GoogleAuthHelper(private val context: Context) {
             }
         } catch (_: Throwable) {}
 
-        return ""
+        return DEFAULT_WEB_CLIENT_ID
     }
 
     suspend fun signInWithGoogle(webClientId: String = ""): FirebaseUser? {
@@ -163,6 +163,8 @@ class GoogleAuthHelper(private val context: Context) {
         }
 
     companion object {
+        const val DEFAULT_WEB_CLIENT_ID = "158879786452-257iofs5d290l4qsccb4mf5nol8t35ca.apps.googleusercontent.com"
+
         /** Converts login exceptions into short messages a normal user can understand. */
         fun friendlyError(e: Throwable): String = when (e) {
             is androidx.credentials.exceptions.GetCredentialCancellationException ->

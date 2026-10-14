@@ -445,4 +445,111 @@ class ExampleRobolectricTest {
         val matchingProfiles = repository.registeredUsers.value.filter { it.firebaseUid == uid }
         assertEquals("Profile count must remain exactly 1", 1, matchingProfiles.size)
     }
+
+    @Test
+    fun customer_cannot_write_businesses_workers_or_offers_test() {
+        val customer = UserProfile(
+            id = "cust_rls_1",
+            firebaseUid = "cust_rls_1",
+            phone = "+91 9825012345",
+            role = UserRole.CUSTOMER,
+            name = "Aarav Shah",
+            email = "aarav@example.com"
+        )
+        repository.setCurrentUser(customer)
+
+        // 1. Customer cannot add an offer
+        val offerResult = repository.addOffer("b1", "Product", "Food", 100.0, 50.0, "DEAL50", "31 Dec 2026")
+        assertFalse("Customer must not be allowed to create an offer", offerResult)
+
+        // 2. Customer cannot update business details
+        val bizResult = repository.updateBusinessDetails("b1", "Hacked Bio", "+91 9825099999", "9825099999", "New Address")
+        assertFalse("Customer must not be allowed to update business details", bizResult)
+
+        // 3. Customer cannot add worker
+        val workerResult = repository.addWorker("Impostor", "Plumber", "+91 9825011111", "Motipura", "5 Years")
+        assertFalse("Customer must not be allowed to add a worker", workerResult)
+
+        // 4. Customer cannot delete an offer
+        val deleteOfferResult = repository.deleteOffer("off_1")
+        assertFalse("Customer must not be allowed to delete an offer", deleteOfferResult)
+    }
+
+    @Test
+    fun business_owner_can_only_modify_own_business_and_offers_test() {
+        val owner = UserProfile(
+            id = "owner_1",
+            firebaseUid = "owner_1",
+            phone = "+91 9825011223",
+            role = UserRole.OWNER,
+            name = "Rajeshbhai Shah",
+            email = "rajesh@example.com"
+        )
+        repository.setCurrentUser(owner)
+
+        // 1. Owner CAN modify own business "b1" (ownerId = "owner_1")
+        val ownBizUpdate = repository.updateBusinessDetails("b1", "Updated Bio", "+91 9825011223", "919825011223", "Shop 4, City Centre")
+        assertTrue("Owner must be able to update own business", ownBizUpdate)
+
+        // 2. Owner CANNOT modify other business "b2" (ownerId = "owner_2")
+        val otherBizUpdate = repository.updateBusinessDetails("b2", "Hacked Bio", "+91 9825011223", "919825011223", "Address")
+        assertFalse("Owner must not be able to update another owner's business", otherBizUpdate)
+
+        // 3. Owner CAN add offer to own business
+        val ownOffer = repository.addOffer("b1", "Mobile Screen Guard", "Mobile & Gadgets", 500.0, 250.0, "SCREEN50", "31 Dec 2026")
+        assertTrue("Owner must be able to add offer to own business", ownOffer)
+
+        // 4. Owner CANNOT add offer to other business "b2"
+        val otherOffer = repository.addOffer("b2", "Kathiyawadi Thali", "Food", 300.0, 150.0, "THALI50", "31 Dec 2026")
+        assertFalse("Owner must not be able to add offer to another owner's business", otherOffer)
+    }
+
+    @Test
+    fun worker_can_only_update_own_profile_test() {
+        val workerUser = UserProfile(
+            id = "w1_profile",
+            firebaseUid = "w1_profile",
+            phone = "+91 9825190812",
+            role = UserRole.WORKER,
+            name = "Ramesh Solanki",
+            email = "ramesh@example.com"
+        )
+        repository.setCurrentUser(workerUser)
+
+        // Worker cannot update another worker's profile
+        val otherUpdate = repository.updateWorkerProfile("w_non_existent", "Other", "Electrician", "+91 9825199999", "Mahavirnagar", "2 Years")
+        assertFalse("Worker must not be able to update non-matching worker listing", otherUpdate)
+    }
+
+    @Test
+    fun update_user_from_sync_preserves_separate_fields_test() {
+        val user = UserProfile(
+            id = "temp_local_id",
+            firebaseUid = "fb_uid_12345",
+            phone = "+91 9825012345",
+            role = UserRole.CUSTOMER,
+            name = "Local Name",
+            email = "google@example.com"
+        )
+        repository.setCurrentUser(user)
+
+        val syncResponse = com.example.data.supabase.SyncProfileResponse(
+            success = true,
+            userId = "11111111-2222-3333-4444-555555555555",
+            role = "customer",
+            name = "Synced Name",
+            phone = "+91 9825012345",
+            email = "google@example.com"
+        )
+
+        val updated = repository.updateUserFromSync(syncResponse)
+        assertNotNull(updated)
+        assertEquals("11111111-2222-3333-4444-555555555555", updated?.id)
+        assertEquals("fb_uid_12345", updated?.firebaseUid)
+        assertEquals("+91 9825012345", updated?.phone)
+        assertEquals("google@example.com", updated?.email)
+        assertEquals("Synced Name", updated?.name)
+        assertEquals(UserRole.CUSTOMER, updated?.role)
+        assertNotEquals(updated?.phone, updated?.email)
+    }
 }
