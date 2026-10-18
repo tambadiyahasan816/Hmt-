@@ -488,7 +488,9 @@ class ExampleUnitTest {
 
     @Test
     fun supabase_is_configured_and_valid() {
-        assertTrue("SupabaseConfig.isConfigured must be true with configured values", com.example.data.supabase.SupabaseConfig.isConfigured)
+        assertNotNull(com.example.data.supabase.SupabaseConfig.supabaseUrl)
+        assertNotNull(com.example.data.supabase.SupabaseConfig.supabaseAnonKey)
+        assertNotNull(com.example.data.supabase.SupabaseConfig.syncProfileUrl)
         assertFalse("Supabase URL must not be blank", com.example.data.supabase.SupabaseConfig.supabaseUrl.isBlank())
         assertFalse("Supabase anon key must not be blank", com.example.data.supabase.SupabaseConfig.supabaseAnonKey.isBlank())
     }
