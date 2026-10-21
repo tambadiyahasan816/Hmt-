@@ -89,13 +89,13 @@ Output location:
 
 ---
 
-## Supabase Backend & Database
+## Local-Only Data & Persistence Architecture
 
-The backend SQL migrations, table definitions, triggers, and Row Level Security (RLS) policies are available in `/supabase`:
-- `supabase/schema.sql` — Complete database schema
-- `supabase/seed.sql` — Authentic Himmatnagar sample shops & deals
-- `supabase/cron.sql` — Automated 10-day reel expiry cron job
-
-> **Security Warning:** The Android application must only use the public `anon` key. Never include the Supabase `service_role` key in the APK.
+The application operates as a standalone, privacy-first, local-only Android app:
+- **Local Persistence:** Room Database (`HimmatnagarDatabase`) and synchronous `LocalPreferences` (`SharedPreferences`) handle device storage.
+- **Profiles & Registrations:** Customer, Business Owner, and Worker registrations are saved locally on the device.
+- **Reels & Media:** Promotional video reels are stored and played locally from device URIs with automatic 10-day local expiry tracking.
+- **Authentication:** Firebase Google Sign-In authenticates users securely without requiring external database sync.
 
 For the complete technical audit and release checklist, refer to [APP_AUDIT.md](./APP_AUDIT.md).
+

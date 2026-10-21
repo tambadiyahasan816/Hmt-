@@ -377,30 +377,17 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun supabase_client_configuration_and_data_source_layer_test() {
-        // 1. Verify SupabaseConfig properties exist and do not crash
-        val url = com.example.data.supabase.SupabaseConfig.supabaseUrl
-        val key = com.example.data.supabase.SupabaseConfig.supabaseAnonKey
-        assertNotNull(url)
-        assertNotNull(key)
-
-        // 2. Instantiate SupabaseDataSource and verify data-source layer exists
-        val dataSource = com.example.data.supabase.SupabaseDataSource(url, key)
-        assertNotNull(dataSource)
-
-        // 3. Verify repository has supabaseDataSource reference
-        assertNotNull(repository.supabaseDataSource)
+    fun local_repository_and_seed_data_test() {
+        assertNotNull(repository.businesses.value)
+        assertTrue("Seed businesses should be populated", repository.businesses.value.isNotEmpty())
+        assertNotNull(repository.offers.value)
+        assertNotNull(repository.reels.value)
+        assertNotNull(repository.workers.value)
     }
 
     @Test
-    fun profile_sync_edge_function_endpoint_and_role_mismatch_test() {
-        // 1. Verify function endpoint URL is configured
-        val endpoint = com.example.data.supabase.SupabaseConfig.syncProfileUrl
-        assertNotNull(endpoint)
-        assertTrue("Sync profile endpoint must be set", endpoint.isNotBlank())
-        assertTrue("Sync profile endpoint must point to sync-profile", endpoint.contains("sync-profile"))
-
-        // 2. Register customer
+    fun profile_role_mismatch_and_update_prevention_test() {
+        // 1. Register customer
         val uid = "test_edge_sync_uid"
         val customer = repository.loginOrRegisterCustomerWithGoogle(
             firebaseUid = uid,
@@ -412,7 +399,7 @@ class ExampleRobolectricTest {
         assertNotNull(customer)
         assertEquals(UserRole.CUSTOMER, customer.role)
 
-        // 3. Same Firebase UID attempting to register as OWNER must throw role mismatch exception
+        // 2. Same Firebase UID attempting to register as OWNER must throw role mismatch exception
         var roleMismatchThrown = false
         try {
             repository.loginOrRegisterOwnerWithGoogle(
@@ -433,7 +420,7 @@ class ExampleRobolectricTest {
         }
         assertTrue("Role mismatch must prevent overwriting role", roleMismatchThrown)
 
-        // 4. Updating the profile with same role should not create a duplicate
+        // 3. Updating the profile with same role should not create a duplicate
         val updatedCustomer = repository.loginOrRegisterCustomerWithGoogle(
             firebaseUid = uid,
             googleName = "Test Customer",
@@ -522,7 +509,7 @@ class ExampleRobolectricTest {
     }
 
     @Test
-    fun update_user_from_sync_preserves_separate_fields_test() {
+    fun local_user_phone_update_preserves_separate_fields_test() {
         val user = UserProfile(
             id = "temp_local_id",
             firebaseUid = "fb_uid_12345",
@@ -533,23 +520,11 @@ class ExampleRobolectricTest {
         )
         repository.setCurrentUser(user)
 
-        val syncResponse = com.example.data.supabase.SyncProfileResponse(
-            success = true,
-            userId = "11111111-2222-3333-4444-555555555555",
-            role = "customer",
-            name = "Synced Name",
-            phone = "+91 9825012345",
-            email = "google@example.com"
-        )
-
-        val updated = repository.updateUserFromSync(syncResponse)
+        val updated = repository.updateUserPhone("fb_uid_12345", "+91 9825098765")
         assertNotNull(updated)
-        assertEquals("11111111-2222-3333-4444-555555555555", updated?.id)
-        assertEquals("fb_uid_12345", updated?.firebaseUid)
-        assertEquals("+91 9825012345", updated?.phone)
+        assertEquals("+91 9825098765", updated?.phone)
         assertEquals("google@example.com", updated?.email)
-        assertEquals("Synced Name", updated?.name)
-        assertEquals(UserRole.CUSTOMER, updated?.role)
+        assertEquals("Local Name", updated?.name)
         assertNotEquals(updated?.phone, updated?.email)
     }
 }

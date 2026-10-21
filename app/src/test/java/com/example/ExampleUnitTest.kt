@@ -297,10 +297,8 @@ class ExampleUnitTest {
         assertTrue("Business owner must be allowed to upload reel", result is com.example.data.model.ReelUploadResult.Success)
         val success = result as com.example.data.model.ReelUploadResult.Success
         assertEquals(initialReelCount + 1, repository.reels.value.size)
-        assertEquals("reels-videos", success.reel.storageBucket)
-        assertTrue("Storage path must be explicitly stored", success.reel.storagePath.isNotBlank())
-        assertTrue("Video URL must contain reels-videos bucket", success.reel.videoUrl.contains("reels-videos"))
         assertEquals("OWNER", success.reel.uploaderRole)
+        assertEquals("Special Diwali Collection Showcase", success.reel.title)
         // Strictly 10 days expiry
         val tenDaysMs = java.util.concurrent.TimeUnit.DAYS.toMillis(10)
         assertEquals(success.reel.createdAt + tenDaysMs, success.reel.expiresAt)
@@ -461,9 +459,7 @@ class ExampleUnitTest {
             businessCategory = "Mobile & Gadgets",
             businessPhone = "+91 98250 11223",
             businessWhatsapp = "919825011223",
-            storageBucket = "reels-videos",
-            storagePath = "reels/owner1/reel_to_purge.mp4",
-            videoUrl = "https://supabase.local/storage/v1/object/public/reels-videos/reels/owner1/reel_to_purge.mp4",
+            videoUrl = "content://media/external/video/media/12345",
             title = "Purge Reel",
             caption = "Caption",
             createdAt = now - java.util.concurrent.TimeUnit.DAYS.toMillis(12),
@@ -487,11 +483,10 @@ class ExampleUnitTest {
     }
 
     @Test
-    fun supabase_is_configured_and_valid() {
-        assertNotNull(com.example.data.supabase.SupabaseConfig.supabaseUrl)
-        assertNotNull(com.example.data.supabase.SupabaseConfig.supabaseAnonKey)
-        assertNotNull(com.example.data.supabase.SupabaseConfig.syncProfileUrl)
-        assertFalse("Supabase URL must not be blank", com.example.data.supabase.SupabaseConfig.supabaseUrl.isBlank())
-        assertFalse("Supabase anon key must not be blank", com.example.data.supabase.SupabaseConfig.supabaseAnonKey.isBlank())
+    fun local_repository_is_initialized() {
+        assertNotNull(repository.businesses.value)
+        assertNotNull(repository.reels.value)
+        assertNotNull(repository.workers.value)
+        assertNotNull(repository.offers.value)
     }
 }

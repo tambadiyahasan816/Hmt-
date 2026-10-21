@@ -85,15 +85,15 @@ HMT is a hyper-local community and marketplace application designed specifically
 
 ---
 
-## 3. Remaining Bugs & Technical Limitations
+## 3. Remaining Technical Considerations
 
-1. **In-Memory Seed Data vs. Live Cloud Sync**:
-   - The app currently seeds 8 authentic Himmatnagar businesses in-memory and caches state locally.
-   - While the Supabase SQL schema exists in `/supabase/schema.sql`, live multi-user cloud synchronization requires connecting the Supabase Kotlin SDK or a REST client (Retrofit) with real authentication tokens.
+1. **Local-Only Architecture**:
+   - The app operates as an independent local-first application using Room Database and SharedPreferences.
+   - All businesses, offers, workers, reels, and profiles are persisted securely on the device without requiring external cloud databases or third-party API keys.
 2. **Reel Video Player**:
-   - Current reels use animated gradient canvas backdrops with video thumbnails. Integration of AndroidX Media3 (ExoPlayer) with HTTP live streaming is required for actual uploaded `.mp4` video playback.
+   - Uses AndroidX Media3 (ExoPlayer) to play local device videos with animated fallback backdrops.
 3. **SMS Gateway for Real OTP**:
-   - Phone verification currently runs in demo mode (code `482910`). For production, Firebase Phone Auth or a specialized Indian SMS gateway (e.g. MSG91, Twilio) must be configured.
+   - Phone verification currently runs in demo mode (code `482910`). For production, Firebase Phone Auth or a specialized Indian SMS gateway (e.g. MSG91, Twilio) can be configured.
 4. **Google Play Services Dependency for Google Sign-In**:
    - Google Sign-In requires the target device to have Google Play Services installed and the SHA-1 fingerprint registered in the Firebase Console.
 
@@ -102,9 +102,9 @@ HMT is a hyper-local community and marketplace application designed specifically
 ## 4. Future Features Roadmap
 
 1. **ExoPlayer & CameraX Reel Creator**:
-   - Integrate `androidx.camera` and `androidx.media3` to record, trim, and upload real vertical video reels directly from within the app.
-2. **Cloudflare Images / Supabase Storage Integration**:
-   - Upload shop cover banners, product deal photos, and worker profile avatars to a secure cloud bucket.
+   - Record, trim, and save real vertical video reels directly onto device storage.
+2. **Local Image Storage**:
+   - Save shop cover banners, product deal photos, and worker profile avatars to local app storage.
 3. **Push Notifications (FCM)**:
    - Alert customers when a followed store publishes a flash discount.
    - Notify shop owners immediately when a customer initiates a chat.
@@ -117,30 +117,12 @@ HMT is a hyper-local community and marketplace application designed specifically
 
 ---
 
-## 5. Supabase Backend Setup Guide
+## 5. Local Data Storage & Persistence Architecture
 
-The complete database schema with Row Level Security (RLS) is located at `/supabase/schema.sql`.
-
-### Setup Steps:
-1. Create a project at [supabase.com](https://supabase.com).
-2. Go to **SQL Editor** -> Click **New Query**.
-3. Paste the contents of `/supabase/schema.sql` and execute.
-   - Sets up `profiles`, `businesses`, `business_posts`, `reels`, `offers`, `workers`, `follows`, `chats`, and `messages`.
-   - Enforces automatic 10-day reel expiry trigger (`set_reel_expiry`).
-4. (Optional) Run `/supabase/seed.sql` to populate sample Himmatnagar data.
-5. Deploy the auto-delete cron job from `/supabase/cron.sql`:
-   ```sql
-   SELECT cron.schedule(
-       'delete-expired-reels-daily',
-       '0 0 * * *',
-       $$ SELECT public.delete_expired_reels(); $$
-   );
-   ```
-
-### ⚠️ CRITICAL SECURITY RULE:
-- **NEVER include the Supabase `service_role` key in the Android APK or source code.**
-- The `service_role` key completely bypasses Row Level Security (RLS). If embedded in an APK, anyone can reverse-engineer it and delete or alter the entire database.
-- The Android app must ONLY use the public `anon` key (`NEXT_PUBLIC_SUPABASE_ANON_KEY` / `SUPABASE_ANON_KEY`). All authorization is enforced by Supabase RLS using the user's JWT token.
+The application is completely decoupled from external databases and operates local-only:
+- **Local SQLite / Room:** Stores cache and transactional records.
+- **LocalPreferences (SharedPreferences):** Synchronously restores active session, customer/owner/worker roles, liked reels, followed shops, and monthly reel upload quotas.
+- **Zero Cloud Leakage:** No database URLs or API keys are required to build or execute the APK.
 
 ---
 

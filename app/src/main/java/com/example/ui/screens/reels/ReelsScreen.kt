@@ -1,7 +1,9 @@
 package com.example.ui.screens.reels
 
 import android.content.Intent
+import android.media.MediaMetadataRetriever
 import android.net.Uri
+import android.provider.OpenableColumns
 import android.widget.Toast
 import kotlinx.coroutines.launch
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -411,7 +413,7 @@ fun ReelsScreen(
                 onConfirm = { title, caption ->
                     onUploadReel(title, caption)
                     showUploadDialog = false
-                    Toast.makeText(context, "Reel published! Set to auto-expire in 10 days.", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Reel published locally! Set to auto-expire in 10 days.", Toast.LENGTH_LONG).show()
                 }
             )
         }
@@ -425,45 +427,84 @@ fun UploadReelDialog(
     onConfirm: (title: String, caption: String) -> Unit
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
     var title by remember { mutableStateOf("") }
     var caption by remember { mutableStateOf("") }
     var selectedVideoUri by remember { mutableStateOf<Uri?>(null) }
-    var videoName by remember { mutableStateOf("showcase_clip.mp4") }
-    var videoDurationSeconds by remember { mutableIntStateOf(35) }
-    var videoSizeMb by remember { mutableFloatStateOf(14.2f) }
-    var videoFormat by remember { mutableStateOf("mp4") }
-    var isUploading by remember { mutableStateOf(false) }
-    var uploadProgress by remember { mutableFloatStateOf(0f) }
-    var uploadStatusText by remember { mutableStateOf("") }
+    var videoName by remember { mutableStateOf("") }
+    var videoDurationSeconds by remember { mutableIntStateOf(0) }
+    var videoSizeMb by remember { mutableFloatStateOf(0f) }
+    var videoSizeBytes by remember { mutableLongStateOf(0L) }
+    var videoFormat by remember { mutableStateOf("") }
     var uploadError by remember { mutableStateOf<String?>(null) }
 
-    // Gallery Picker Launcher
+    // Real Gallery Video Picker Launcher
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         if (uri != null) {
             selectedVideoUri = uri
-            val filename = uri.lastPathSegment ?: "gallery_video.mp4"
-            videoName = filename
-            val ext = filename.substringAfterLast(".", "mp4").lowercase()
-            videoFormat = ext
-            // Dynamic check / simulated extraction
-            videoDurationSeconds = 40
-            videoSizeMb = 18.5f
             uploadError = null
+            try {
+                // Read display name and file size via ContentResolver and OpenableColumns
+                context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                    val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (cursor.moveToFirst()) {
+                        if (nameIndex != -1) {
+                            videoName = cursor.getString(nameIndex) ?: "video.mp4"
+                        }
+                        if (sizeIndex != -1) {
+                            val bytes = cursor.getLong(sizeIndex)
+                            videoSizeBytes = bytes
+                            videoSizeMb = bytes / (1024f * 1024f)
+                        }
+                    }
+                }
+                if (videoName.isBlank()) {
+                    videoName = uri.lastPathSegment ?: "video.mp4"
+                }
+
+                // Read real duration and mime type via MediaMetadataRetriever
+                val retriever = MediaMetadataRetriever()
+                try {
+                    retriever.setDataSource(context, uri)
+                    val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                    val durationMs = durationStr?.toLongOrNull() ?: 0L
+                    videoDurationSeconds = (durationMs / 1000).toInt()
+                    val mime = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)
+                    if (!mime.isNullOrBlank()) {
+                        videoFormat = mime.substringAfterLast("/", "mp4").lowercase()
+                    } else {
+                        videoFormat = videoName.substringAfterLast(".", "mp4").lowercase()
+                    }
+                } finally {
+                    try { retriever.release() } catch (_: Exception) {}
+                }
+
+                // Strictly validate 60s and 25MB limits
+                if (videoDurationSeconds > 60) {
+                    uploadError = "Video duration ($videoDurationSeconds s) exceeds the 60 seconds limit."
+                } else if (videoSizeMb > 25.0f) {
+                    uploadError = "Video size (${String.format(java.util.Locale.US, "%.1f", videoSizeMb)} MB) exceeds the 25MB limit."
+                } else if (videoDurationSeconds <= 0 && videoSizeBytes == 0L) {
+                    uploadError = "Could not parse video metadata from selected file."
+                }
+            } catch (e: Exception) {
+                uploadError = "Error reading video file: ${e.message}"
+            }
         }
     }
 
     val hasQuota = remainingQuota > 0
-    val isFormatValid = videoFormat in listOf("mp4", "mkv", "mov", "webm")
+    val isFormatValid = videoFormat.isBlank() || videoFormat in listOf("mp4", "mkv", "mov", "webm", "3gp")
     val isDurationValid = videoDurationSeconds in 1..60
-    val isSizeValid = videoSizeMb <= 50f
-    val isVideoValid = isFormatValid && isDurationValid && isSizeValid
-    val canPublish = hasQuota && title.isNotBlank() && isVideoValid && !isUploading
+    val isSizeValid = videoSizeMb in 0.01f..25.0f
+    val isVideoSelected = selectedVideoUri != null
+    val isVideoValid = isVideoSelected && isFormatValid && isDurationValid && isSizeValid && uploadError == null
+    val canPublish = hasQuota && title.isNotBlank() && isVideoValid
 
     AlertDialog(
-        onDismissRequest = { if (!isUploading) onDismiss() },
+        onDismissRequest = onDismiss,
         title = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.VideoCameraBack, contentDescription = null, tint = BrandSecondary)
@@ -518,47 +559,25 @@ fun UploadReelDialog(
 
                 Spacer(modifier = Modifier.height(10.dp))
 
-                // 2. Video Source Selection (Gallery or Camera recording)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // 2. Video Selection (Real Video Picker)
+                OutlinedButton(
+                    onClick = { galleryLauncher.launch("video/*") },
+                    modifier = Modifier.fillMaxWidth().height(44.dp),
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp)
                 ) {
-                    OutlinedButton(
-                        onClick = { galleryLauncher.launch("video/*") },
-                        enabled = !isUploading,
-                        modifier = Modifier.weight(1f).height(40.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp)
-                    ) {
-                        Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(15.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Gallery", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                    }
-
-                    OutlinedButton(
-                        onClick = {
-                            // Camera / Sample capture selector
-                            videoName = "camera_capture_${System.currentTimeMillis().toString().takeLast(4)}.mp4"
-                            videoDurationSeconds = 30
-                            videoSizeMb = 12.0f
-                            videoFormat = "mp4"
-                            uploadError = null
-                            Toast.makeText(context, "Camera clip recorded (30s, 12MB)", Toast.LENGTH_SHORT).show()
-                        },
-                        enabled = !isUploading,
-                        modifier = Modifier.weight(1f).height(40.dp),
-                        shape = RoundedCornerShape(8.dp),
-                        contentPadding = PaddingValues(horizontal = 6.dp)
-                    ) {
-                        Icon(Icons.Default.Videocam, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Record", fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
-                    }
+                    Icon(Icons.Default.PhotoLibrary, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = if (isVideoSelected) "Change Video File" else "Choose Video (Max 60s, 25MB)",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // 3. Video Specifications & Real Validation Card
+                // 3. Video Specifications & Validation Card
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(10.dp),
@@ -567,29 +586,28 @@ fun UploadReelDialog(
                     Column(modifier = Modifier.padding(10.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
-                                imageVector = if (isVideoValid) Icons.Default.CheckCircle else Icons.Default.Error,
+                                imageVector = if (isVideoValid) Icons.Default.CheckCircle else if (isVideoSelected) Icons.Default.Error else Icons.Default.Info,
                                 contentDescription = null,
-                                tint = if (isVideoValid) BrandAccent else DangerRed,
+                                tint = if (isVideoValid) BrandAccent else if (isVideoSelected) DangerRed else MaterialTheme.colorScheme.outline,
                                 modifier = Modifier.size(18.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Column {
-                                Text(videoName, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 Text(
-                                    text = "Duration: ${videoDurationSeconds}s (max 60s) • Size: ${String.format(java.util.Locale.US, "%.1f", videoSizeMb)}MB (max 50MB)",
+                                    text = if (isVideoSelected) videoName else "No video selected yet",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = if (isVideoSelected) {
+                                        "Duration: ${videoDurationSeconds}s (max 60s) • Size: ${String.format(java.util.Locale.US, "%.1f", videoSizeMb)}MB (max 25MB)"
+                                    } else {
+                                        "Select a video clip under 60 seconds and 25MB"
+                                    },
                                     fontSize = 10.sp,
-                                    color = if (isVideoValid) MaterialTheme.colorScheme.outline else DangerRed
+                                    color = if (isVideoValid || !isVideoSelected) MaterialTheme.colorScheme.outline else DangerRed
                                 )
                             }
-                        }
-                        if (videoSizeMb > 15f) {
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = "High quality clip: Will be compressed before upload",
-                                fontSize = 9.sp,
-                                color = BrandSecondaryDark,
-                                fontWeight = FontWeight.Medium
-                            )
                         }
                     }
                 }
@@ -603,7 +621,6 @@ fun UploadReelDialog(
                     label = { Text("Reel Headline") },
                     placeholder = { Text("e.g. New Festive Stock Arrival!") },
                     singleLine = true,
-                    enabled = !isUploading,
                     modifier = Modifier.fillMaxWidth()
                 )
 
@@ -615,11 +632,10 @@ fun UploadReelDialog(
                     label = { Text("Caption & Details") },
                     placeholder = { Text("Describe products, offers & timings...") },
                     maxLines = 2,
-                    enabled = !isUploading,
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // 5. Upload Error / Retry banner
+                // 5. Upload Error / Validation banner
                 if (uploadError != null) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Card(
@@ -633,30 +649,12 @@ fun UploadReelDialog(
                             Icon(Icons.Default.Error, contentDescription = null, tint = DangerRed, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = uploadError ?: "Upload failed",
+                                text = uploadError ?: "Validation failed",
                                 fontSize = 11.sp,
                                 color = DangerRed,
                                 modifier = Modifier.weight(1f)
                             )
                         }
-                    }
-                }
-
-                // 6. Upload Progress Stages
-                if (isUploading) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        LinearProgressIndicator(
-                            progress = { uploadProgress },
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = uploadStatusText,
-                            fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.SemiBold
-                        )
                     }
                 }
             }
@@ -665,50 +663,19 @@ fun UploadReelDialog(
             Button(
                 onClick = {
                     if (canPublish) {
-                        isUploading = true
-                        uploadError = null
-                        uploadStatusText = "1/4: Validating video format & 60s limit..."
-                        uploadProgress = 0.2f
-                        coroutineScope.launch {
-                            try {
-                                kotlinx.coroutines.delay(120)
-                                if (videoSizeMb > 15f) {
-                                    uploadStatusText = "2/4: Compressing video for fast streaming..."
-                                    uploadProgress = 0.45f
-                                    kotlinx.coroutines.delay(150)
-                                }
-                                uploadStatusText = "3/4: Uploading to reels-videos bucket..."
-                                uploadProgress = 0.8f
-                                kotlinx.coroutines.delay(150)
-                                uploadStatusText = "4/4: Creating database record (strictly 10 days expiry)..."
-                                uploadProgress = 1.0f
-                                kotlinx.coroutines.delay(100)
-                                onConfirm(title, caption)
-                            } catch (e: Exception) {
-                                uploadError = "Upload error: ${e.message ?: "Failed to upload"}. Quota was not consumed."
-                                uploadProgress = 0f
-                            } finally {
-                                isUploading = false
-                            }
-                        }
+                        onConfirm(
+                            title.trim(),
+                            caption.trim()
+                        )
                     }
                 },
                 enabled = canPublish
             ) {
-                if (isUploading) {
-                    CircularProgressIndicator(modifier = Modifier.size(16.dp), color = MaterialTheme.colorScheme.onPrimary, strokeWidth = 2.dp)
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text("Uploading...")
-                } else {
-                    Text(if (hasQuota) "Publish Reel" else "Limit Reached")
-                }
+                Text(if (hasQuota) "Publish Reel" else "Limit Reached")
             }
         },
         dismissButton = {
-            TextButton(
-                onClick = onDismiss,
-                enabled = !isUploading
-            ) {
+            TextButton(onClick = onDismiss) {
                 Text("Cancel")
             }
         }

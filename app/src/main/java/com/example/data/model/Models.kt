@@ -164,9 +164,7 @@ data class Reel(
     val businessCategory: String,
     val businessPhone: String,
     val businessWhatsapp: String,
-    val storageBucket: String = "reels-videos",
-    val storagePath: String = "",
-    val videoUrl: String = "",
+    val videoUrl: String = "", // Local file / content URI if recorded/picked
     val title: String,
     val caption: String,
     val likes: Int = 0,
@@ -256,4 +254,14 @@ data class ChatMessage(
     val timestamp: Long = System.currentTimeMillis(),
     val isFromOwner: Boolean = false,
     val customerId: String = ""
+)
+
+/** Everything the UI knows about a reel the user wants to publish. */
+data class ReelUploadRequest(
+    val title: String,
+    val caption: String,
+    val videoUri: android.net.Uri? = null,
+    val durationSeconds: Int = 0,
+    val sizeBytes: Long = 0L,
+    val mimeType: String = "video/mp4"
 )

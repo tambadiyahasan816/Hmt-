@@ -3,21 +3,15 @@ package com.example.data.repository
 import android.content.Context
 import com.example.data.local.LocalPreferences
 import com.example.data.model.*
-import com.example.data.supabase.SupabaseDataSource
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 class HimmatnagarRepository(
-    context: Context? = null,
-    val supabaseDataSource: SupabaseDataSource = SupabaseDataSource(),
-    val isTesting: Boolean = false
+    context: Context? = null
 ) {
 
     private var localPrefs: LocalPreferences? = context?.let { LocalPreferences(it) }
@@ -62,8 +56,8 @@ class HimmatnagarRepository(
 
     init {
         restorePersistedState()
-        // Production path: Do not load in-memory sample businesses/workers/offers when Supabase is configured
-        if (isTesting || !com.example.data.supabase.SupabaseConfig.isConfigured) {
+        // Always populate default Himmatnagar community and market data if empty
+        if (_businesses.value.isEmpty()) {
             seedInitialData()
         }
     }
@@ -112,7 +106,7 @@ class HimmatnagarRepository(
         }
 
         fun createForTesting(): HimmatnagarRepository {
-            return HimmatnagarRepository(null, isTesting = true)
+            return HimmatnagarRepository(null)
         }
     }
 
@@ -674,28 +668,6 @@ class HimmatnagarRepository(
         _businesses.value = listOf(newBusiness) + _businesses.value
         _businessViews.value = _businessViews.value + (newBusiness.id to 0)
 
-        if (com.example.data.supabase.SupabaseConfig.isConfigured && !isTesting) {
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val req = com.example.data.supabase.CreateBusinessRequest(
-                        ownerId = cleanUid,
-                        name = cleanShop,
-                        category = cleanCat,
-                        phone = cleanPhone,
-                        whatsapp = cleanWa,
-                        area = cleanArea,
-                        address = if (cleanAddr.isNotBlank()) cleanAddr else "$cleanArea, Himmatnagar",
-                        lat = HimmatnagarLocations.CENTER_LAT,
-                        lng = HimmatnagarLocations.CENTER_LNG,
-                        bio = "Official store in $cleanArea, Himmatnagar."
-                    )
-                    val res = supabaseDataSource.createBusiness(req)
-                    if (res.isSuccess) {
-                        refreshBusinesses()
-                    }
-                } catch (_: Exception) {}
-            }
-        }
         return Pair(newUser, newBusiness)
     }
 
@@ -768,25 +740,6 @@ class HimmatnagarRepository(
         )
         _workers.value = listOf(newWorker) + _workers.value
 
-        if (com.example.data.supabase.SupabaseConfig.isConfigured && !isTesting) {
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val req = com.example.data.supabase.CreateWorkerRequest(
-                        profileId = cleanUid,
-                        name = cleanWorkerName,
-                        serviceType = cleanService,
-                        phone = cleanPhone,
-                        area = cleanArea,
-                        experienceYears = if (cleanExp.isNotBlank()) cleanExp else "Experienced",
-                        photoUrl = if (photoUrl.isNotBlank()) photoUrl.trim() else null
-                    )
-                    val res = supabaseDataSource.createWorker(req)
-                    if (res.isSuccess) {
-                        refreshWorkers()
-                    }
-                } catch (_: Exception) {}
-            }
-        }
         return Pair(newUser, newWorker)
     }
 
@@ -972,6 +925,13 @@ class HimmatnagarRepository(
         }
     }
 
+    // Record Reel View
+    fun recordReelView(reelId: String) {
+        _reels.value = _reels.value.map {
+            if (it.id == reelId) it.copy(views = it.views + 1) else it
+        }
+    }
+
     // ====================================================================
     // REEL QUOTA & UPLOAD SYSTEM (Asia/Kolkata calendar month, Max 3 reels)
     // ====================================================================
@@ -1034,12 +994,12 @@ class HimmatnagarRepository(
             return ReelUploadResult.Error("Title and caption cannot be blank.")
         }
 
-        // 3. Video constraints: max 60s, max 50MB
+        // 3. Video constraints: max 60s, max 25MB
         if (videoDurationSeconds > 60) {
             return ReelUploadResult.Error("Video duration exceeds the maximum limit of 60 seconds.")
         }
-        if (fileSizeBytes > 50 * 1024 * 1024) {
-            return ReelUploadResult.Error("Video file size exceeds the 50MB limit.")
+        if (fileSizeBytes > 25 * 1024 * 1024) {
+            return ReelUploadResult.Error("Video file size exceeds the 25MB limit.")
         }
 
         // 4. Monthly quota check (Asia/Kolkata calendar month, max 3)
@@ -1055,15 +1015,11 @@ class HimmatnagarRepository(
             return ReelUploadResult.Error("Upload failed: Storage upload encountered an error. Quota was not consumed.")
         }
 
-        // 6. Calculate server timestamps: created_at and strictly created_at + 10 days
+        // 6. Calculate server/system timestamps: created_at and strictly created_at + 10 days
         val serverCreatedAt = System.currentTimeMillis()
         val serverExpiresAt = serverCreatedAt + TimeUnit.DAYS.toMillis(10)
 
-        // 7. Resolve business/worker identity and exact storage paths
         val reelId = "reel_${UUID.randomUUID().toString().take(8)}"
-        val storageBucket = "reels-videos"
-        val storagePath = "reels/$uploaderId/$reelId.mp4"
-        val videoUrl = "https://supabase.sheherhimmatnagar.local/storage/v1/object/public/$storageBucket/$storagePath"
 
         var bId = ""
         var wId = ""
@@ -1104,9 +1060,7 @@ class HimmatnagarRepository(
             businessCategory = bCat,
             businessPhone = bPhone,
             businessWhatsapp = bWa,
-            storageBucket = storageBucket,
-            storagePath = storagePath,
-            videoUrl = videoUrl,
+            videoUrl = videoUriString,
             title = trimmedTitle,
             caption = trimmedCaption,
             likes = 0,
@@ -1119,7 +1073,7 @@ class HimmatnagarRepository(
         // Add to active reels
         _reels.value = listOf(newReel) + _reels.value
 
-        // 8. Consume monthly quota only upon successful publish
+        // 7. Consume monthly quota only upon successful publish
         incrementMonthlyReelUploadCount(uploaderId, currentMonthKey)
         val remaining = getRemainingMonthlyReelQuota(uploaderId, currentMonthKey)
 
@@ -1212,26 +1166,6 @@ class HimmatnagarRepository(
                 validUntil = trimmedValidUntil
             )
             _offers.value = listOf(newOffer) + _offers.value
-
-            if (com.example.data.supabase.SupabaseConfig.isConfigured && !isTesting) {
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        val req = com.example.data.supabase.CreateOfferRequest(
-                            businessId = business?.id ?: businessId,
-                            productName = trimmedProduct,
-                            originalPrice = originalPrice,
-                            discountedPrice = discountedPrice,
-                            discountPercent = discountPercent,
-                            couponCode = trimmedCode,
-                            validUntil = trimmedValidUntil
-                        )
-                        val res = supabaseDataSource.createOffer(req)
-                        if (res.isSuccess) {
-                            refreshOffers()
-                        }
-                    } catch (_: Exception) {}
-                }
-            }
             return true
         } finally {
             _isSavingOffer.set(false)
@@ -1251,17 +1185,6 @@ class HimmatnagarRepository(
         }
 
         _offers.value = _offers.value.filter { it.id != offerId }
-
-        if (com.example.data.supabase.SupabaseConfig.isConfigured && !isTesting) {
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val res = supabaseDataSource.deleteOffer(offerId)
-                    if (res.isSuccess) {
-                        refreshOffers()
-                    }
-                } catch (_: Exception) {}
-            }
-        }
         return true
     }
 
@@ -1301,23 +1224,6 @@ class HimmatnagarRepository(
                         address = trimmedAddr
                     )
                 } else it
-            }
-
-            if (com.example.data.supabase.SupabaseConfig.isConfigured && !isTesting) {
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        val req = com.example.data.supabase.UpdateBusinessRequest(
-                            bio = trimmedBio,
-                            phone = trimmedPhone,
-                            whatsapp = trimmedWa,
-                            address = trimmedAddr
-                        )
-                        val res = supabaseDataSource.updateBusiness(businessId, req)
-                        if (res.isSuccess) {
-                            refreshBusinesses()
-                        }
-                    } catch (_: Exception) {}
-                }
             }
             return true
         } finally {
@@ -1367,24 +1273,6 @@ class HimmatnagarRepository(
         _currentUser.value = _currentUser.value?.copy(name = trimmedName, phone = trimmedPhone).also {
             localPrefs?.saveCurrentUser(it)
         }
-
-        if (com.example.data.supabase.SupabaseConfig.isConfigured && !isTesting) {
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val req = com.example.data.supabase.UpdateWorkerRequest(
-                        name = trimmedName,
-                        serviceType = trimmedService,
-                        phone = trimmedPhone,
-                        area = trimmedArea,
-                        experienceYears = trimmedExp
-                    )
-                    val res = supabaseDataSource.updateWorker(worker.id, req)
-                    if (res.isSuccess) {
-                        refreshWorkers()
-                    }
-                } catch (_: Exception) {}
-            }
-        }
         return true
     }
 
@@ -1428,25 +1316,6 @@ class HimmatnagarRepository(
                 createdBy = user?.name ?: "Community"
             )
             _workers.value = listOf(newWorker) + _workers.value
-
-            if (com.example.data.supabase.SupabaseConfig.isConfigured && !isTesting) {
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        val req = com.example.data.supabase.CreateWorkerRequest(
-                            profileId = user?.firebaseUid ?: user?.id,
-                            name = trimmedName,
-                            serviceType = trimmedService,
-                            phone = trimmedPhone,
-                            area = trimmedArea,
-                            experienceYears = trimmedExp
-                        )
-                        val res = supabaseDataSource.createWorker(req)
-                        if (res.isSuccess) {
-                            refreshWorkers()
-                        }
-                    } catch (_: Exception) {}
-                }
-            }
             return true
         } finally {
             _isSavingWorker.set(false)
@@ -1495,147 +1364,5 @@ class HimmatnagarRepository(
         localPrefs?.saveFollowedBusinesses(updatedFollows)
         _businessViews.value = _businessViews.value - businessId
         _chatMessages.value = _chatMessages.value.filter { it.businessId != businessId }
-
-        if (com.example.data.supabase.SupabaseConfig.isConfigured && !isTesting) {
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    val res = supabaseDataSource.deleteBusiness(businessId)
-                    if (res.isSuccess) {
-                        refreshBusinesses()
-                        refreshOffers()
-                    }
-                } catch (_: Exception) {}
-            }
-        }
-    }
-
-    // =========================================================================
-    // Supabase Public Data-Source Layer & Refresh
-    // =========================================================================
-
-    suspend fun refreshBusinesses(): Result<List<Business>> = runCatching {
-        val remoteBusinesses = supabaseDataSource.fetchPublicBusinesses().getOrThrow()
-        val existingMap = _businesses.value.associateBy { it.id }
-        val merged = remoteBusinesses.map { rb ->
-            val local = existingMap[rb.id]
-            if (local != null) {
-                rb.copy(
-                    followerCount = local.followerCount,
-                    rating = local.rating,
-                    reviewCount = local.reviewCount
-                )
-            } else rb
-        }
-        _businesses.value = merged
-        merged
-    }
-
-    suspend fun refreshWorkers(): Result<List<Worker>> = runCatching {
-        val remoteWorkers = supabaseDataSource.fetchPublicWorkers().getOrThrow()
-        _workers.value = remoteWorkers
-        remoteWorkers
-    }
-
-    suspend fun refreshOffers(): Result<List<Offer>> = runCatching {
-        val remoteOffers = supabaseDataSource.fetchPublicOffers().getOrThrow()
-        val businessMap = _businesses.value.associateBy { it.id }
-        val mapped = remoteOffers.map { ro ->
-            if (ro.businessName.isBlank()) {
-                val b = businessMap[ro.businessId]
-                ro.copy(
-                    businessName = b?.name ?: "",
-                    area = b?.area ?: "",
-                    category = b?.category ?: ""
-                )
-            } else ro
-        }
-        _offers.value = mapped
-        mapped
-    }
-
-    fun updateUserFromSync(response: com.example.data.supabase.SyncProfileResponse?): UserProfile? {
-        if (response == null || !response.success) return null
-        val current = _currentUser.value ?: return null
-        val updated = current.copy(
-            id = response.userId ?: current.id,
-            name = response.name ?: current.name,
-            phone = response.phone ?: current.phone,
-            email = response.email ?: current.email,
-            role = response.role?.let { r ->
-                try { UserRole.valueOf(r.uppercase()) } catch (_: Exception) { null }
-            } ?: current.role,
-            updatedAt = System.currentTimeMillis()
-        )
-        _currentUser.value = updated
-        _registeredUsers.value = _registeredUsers.value.map {
-            if (it.firebaseUid == current.firebaseUid || it.id == current.id) updated else it
-        }
-        localPrefs?.saveCurrentUser(updated)
-        localPrefs?.saveRegisteredUsers(_registeredUsers.value)
-        return updated
-    }
-
-    suspend fun refreshFromSupabase(): Result<Unit> = runCatching {
-        // 1. Fetch public businesses
-        val businessesResult = supabaseDataSource.fetchPublicBusinesses()
-        businessesResult.getOrNull()?.let { remoteBusinesses ->
-            if (remoteBusinesses.isNotEmpty()) {
-                val existingMap = _businesses.value.associateBy { it.id }
-                val merged = remoteBusinesses.map { rb ->
-                    val local = existingMap[rb.id]
-                    if (local != null) {
-                        rb.copy(
-                            followerCount = local.followerCount,
-                            rating = local.rating,
-                            reviewCount = local.reviewCount
-                        )
-                    } else rb
-                }
-                _businesses.value = merged
-            }
-        }
-
-        // 2. Fetch public workers
-        val workersResult = supabaseDataSource.fetchPublicWorkers()
-        workersResult.getOrNull()?.let { remoteWorkers ->
-            if (remoteWorkers.isNotEmpty()) {
-                _workers.value = remoteWorkers
-            }
-        }
-
-        // 3. Fetch active reels
-        val reelsResult = supabaseDataSource.fetchActiveReels()
-        reelsResult.getOrNull()?.let { remoteReels ->
-            if (remoteReels.isNotEmpty()) {
-                val activeOnly = remoteReels.filter { !it.isExpired() }
-                _reels.value = activeOnly
-            }
-        }
-
-        // 4. Fetch public offers
-        val offersResult = supabaseDataSource.fetchPublicOffers()
-        offersResult.getOrNull()?.let { remoteOffers ->
-            if (remoteOffers.isNotEmpty()) {
-                _offers.value = remoteOffers
-            }
-        }
-    }
-
-    suspend fun syncProfileWithEdgeFunction(
-        firebaseIdToken: String,
-        role: String,
-        name: String,
-        phone: String,
-        email: String,
-        avatarUrl: String? = null
-    ): Result<com.example.data.supabase.SyncProfileResponse> {
-        return supabaseDataSource.syncProfileWithEdgeFunction(
-            firebaseIdToken = firebaseIdToken,
-            role = role,
-            name = name,
-            phone = phone,
-            email = email,
-            avatarUrl = avatarUrl
-        )
     }
 }
