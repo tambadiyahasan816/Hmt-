@@ -11,12 +11,20 @@ android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
 
+  val supabaseUrl = (project.findProperty("SUPABASE_URL")?.toString() ?: "")
+    .replace("\\", "\\\\").replace("\"", "\\\"")
+  val supabasePublishableKey = (project.findProperty("SUPABASE_PUBLISHABLE_KEY")?.toString() ?: "")
+    .replace("\\", "\\\\").replace("\"", "\\\"")
+
   defaultConfig {
     applicationId = "com.aistudio.sheherhimmatnagar.kznvxp"
     minSdk = 24
     targetSdk = 36
     versionCode = 1
     versionName = "1.0"
+
+    buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+    buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$supabasePublishableKey\"")
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "158879786452",
+    "project_id": "himmatnagar-f48d0",
+    "storage_bucket": "himmatnagar-f48d0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:158879786452:android:dac5ec46ccd17b6b47a241",
+        "android_client_info": {
+          "package_name": "com.aistudio.sheherhimmatnagar.kznvxp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "158879786452-jhtp7bvh02d63jco5uedrkj9k0e09ir7.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.aistudio.sheherhimmatnagar.kznvxp",
+            "certificate_hash": "be4cc64480e59158ececfd3efed131b9cf449d98"
+          }
+        },
+        {
+          "client_id": "158879786452-257iofs5d290l4qsccb4mf5nol8t35ca.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDXHp0UCNhKl9BEhSUfFhY5SVl8kf2Ud3Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "158879786452-257iofs5d290l4qsccb4mf5nol8t35ca.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
