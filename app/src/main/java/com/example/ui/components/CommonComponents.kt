@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,7 +18,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -32,13 +32,10 @@ import com.example.data.model.Offer
 import com.example.data.model.Worker
 import com.example.ui.theme.*
 
-// FIX 4: VERIFIED_BADGE_HIDDEN — will be used for paid plans later
-// The green "VERIFIED" badge is removed/hidden from ALL business cards and profiles everywhere in the app.
-// Do not delete the feature from code — just hide it from UI.
+// VERIFIED_BADGE_HIDDEN — retained for future paid plans without modifying logic
 @Composable
 fun VerifiedBadge(modifier: Modifier = Modifier) {
-    // VERIFIED_BADGE_HIDDEN — will be used for paid plans later
-    // Purposefully rendering nothing so the badge is hidden across the application.
+    // Purposefully rendering nothing so the badge remains hidden across the app
 }
 
 @Composable
@@ -47,14 +44,14 @@ fun ExpiryCountdownBadge(
     modifier: Modifier = Modifier
 ) {
     val isUrgent = remainingDays <= 2
-    val bgColor = if (isUrgent) DangerRed else Color(0xFF1E293B)
-    val textColor = if (isUrgent) Color.White else Color(0xFFFBBF24)
+    val tintColor = if (isUrgent) DangerRed else BrandAmber
+    val containerColor = if (isUrgent) DangerRed.copy(alpha = 0.12f) else BrandAmber.copy(alpha = 0.14f)
 
     Row(
         modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-            .background(bgColor.copy(alpha = 0.92f))
-            .border(1.dp, textColor.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(12.dp))
+            .background(containerColor)
+            .border(BorderStroke(1.dp, tintColor.copy(alpha = 0.45f)), RoundedCornerShape(12.dp))
             .padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -62,14 +59,14 @@ fun ExpiryCountdownBadge(
         Icon(
             imageVector = if (isUrgent) Icons.Default.Warning else Icons.Default.Timer,
             contentDescription = "Countdown Expiry",
-            tint = textColor,
+            tint = tintColor,
             modifier = Modifier.size(13.dp)
         )
         Text(
             text = if (remainingDays == 1) "Expires in 1 day" else "Expires in $remainingDays days",
             fontSize = 11.sp,
             fontWeight = FontWeight.Bold,
-            color = textColor
+            color = tintColor
         )
     }
 }
@@ -128,7 +125,8 @@ fun BusinessCard(
             .clickable { onClick() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -139,7 +137,7 @@ fun BusinessCard(
                 Box(
                     modifier = Modifier
                         .size(46.dp)
-                        .clip(RoundedCornerShape(12.dp))
+                        .clip(RoundedCornerShape(14.dp))
                         .background(MaterialTheme.colorScheme.primaryContainer),
                     contentAlignment = Alignment.Center
                 ) {
@@ -161,11 +159,11 @@ fun BusinessCard(
                             text = business.name,
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
                         )
-                        // VERIFIED_BADGE_HIDDEN — will be used for paid plans later
                         if (business.isApproved) {
                             VerifiedBadge()
                         }
@@ -179,8 +177,9 @@ fun BusinessCard(
                     ) {
                         Text(
                             text = business.category,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.primary
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.secondary,
+                            fontWeight = FontWeight.SemiBold
                         )
                         Text(
                             text = "•",
@@ -194,6 +193,7 @@ fun BusinessCard(
                                 tint = MaterialTheme.colorScheme.outline,
                                 modifier = Modifier.size(12.dp)
                             )
+                            Spacer(modifier = Modifier.width(2.dp))
                             Text(
                                 text = business.area,
                                 style = MaterialTheme.typography.bodySmall,
@@ -216,7 +216,7 @@ fun BusinessCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Action Row: Rating / New Badge, Followers, Call, WhatsApp, Open Profile
+            // Action Row: Rating, Followers, Call, WhatsApp, Open Profile
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
@@ -231,12 +231,13 @@ fun BusinessCard(
                             imageVector = Icons.Default.Star,
                             contentDescription = "Rating",
                             tint = GoldenStar,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                         Text(
                             text = String.format("%.1f", business.rating),
                             style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                         if (business.reviewCount > 0) {
                             Text(
@@ -248,7 +249,7 @@ fun BusinessCard(
                     } else {
                         Surface(
                             color = MaterialTheme.colorScheme.surfaceVariant,
-                            shape = RoundedCornerShape(4.dp)
+                            shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
                                 text = "New",
@@ -264,26 +265,32 @@ fun BusinessCard(
                     Text(
                         text = "${business.followerCount} followers",
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     FilledTonalIconButton(
                         onClick = { launchDialer(context, business.phone) },
-                        modifier = Modifier.size(34.dp)
+                        modifier = Modifier.size(34.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = IconButtonDefaults.filledTonalIconButtonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     ) {
                         Icon(
                             imageVector = Icons.Default.Phone,
                             contentDescription = "Call",
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                     }
 
                     FilledTonalIconButton(
                         onClick = { launchWhatsApp(context, business.whatsapp) },
+                        shape = RoundedCornerShape(10.dp),
                         colors = IconButtonDefaults.filledTonalIconButtonColors(
-                            containerColor = WhatsAppGreen.copy(alpha = 0.15f),
+                            containerColor = WhatsAppGreen.copy(alpha = 0.12f),
                             contentColor = WhatsAppGreen
                         ),
                         modifier = Modifier.size(34.dp)
@@ -291,17 +298,21 @@ fun BusinessCard(
                         Icon(
                             imageVector = Icons.Default.Send,
                             contentDescription = "WhatsApp",
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(15.dp)
                         )
                     }
 
                     Button(
                         onClick = onClick,
                         shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary,
+                            contentColor = MaterialTheme.colorScheme.onPrimary
+                        ),
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                         modifier = Modifier.height(34.dp)
                     ) {
-                        Text(text = "View", fontSize = 12.sp)
+                        Text(text = "View", fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                     }
                 }
             }
@@ -309,7 +320,6 @@ fun BusinessCard(
     }
 }
 
-// FIX 2: Workers get a simple profile card: name, service, area, experience, tap-to-call button, WhatsApp button.
 @Composable
 fun WorkerCard(
     worker: Worker,
@@ -321,7 +331,8 @@ fun WorkerCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
             modifier = Modifier
@@ -331,15 +342,15 @@ fun WorkerCard(
         ) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
-                    .clip(CircleShape)
-                    .background(BrandPrimaryContainer),
+                    .size(46.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(MaterialTheme.colorScheme.primaryContainer),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector = Icons.Default.Engineering,
                     contentDescription = null,
-                    tint = BrandPrimary,
+                    tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -350,12 +361,13 @@ fun WorkerCard(
                 Text(
                     text = worker.name,
                     style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
                     text = worker.serviceType,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = BrandPrimary,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.secondary,
                     fontWeight = FontWeight.SemiBold
                 )
                 Spacer(modifier = Modifier.height(2.dp))
@@ -379,27 +391,33 @@ fun WorkerCard(
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilledTonalIconButton(
                     onClick = onCallClick,
-                    modifier = Modifier.size(38.dp)
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.size(36.dp),
+                    colors = IconButtonDefaults.filledTonalIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 ) {
                     Icon(
                         imageVector = Icons.Default.Phone,
                         contentDescription = "Call",
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
 
                 FilledTonalIconButton(
                     onClick = onWhatsAppClick,
+                    shape = RoundedCornerShape(10.dp),
                     colors = IconButtonDefaults.filledTonalIconButtonColors(
-                        containerColor = WhatsAppGreen.copy(alpha = 0.15f),
+                        containerColor = WhatsAppGreen.copy(alpha = 0.12f),
                         contentColor = WhatsAppGreen
                     ),
-                    modifier = Modifier.size(38.dp)
+                    modifier = Modifier.size(36.dp)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Send,
                         contentDescription = "WhatsApp",
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(16.dp)
                     )
                 }
             }
@@ -420,7 +438,8 @@ fun OfferCard(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
             Row(
@@ -433,6 +452,7 @@ fun OfferCard(
                         text = offer.productName,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -440,8 +460,8 @@ fun OfferCard(
                     Text(
                         text = "Sold by ${offer.businessName}",
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        fontWeight = FontWeight.SemiBold,
                         modifier = Modifier.clickable { onShopClick() }
                     )
                     Text(
@@ -451,15 +471,11 @@ fun OfferCard(
                     )
                 }
 
-                // Discount Badge
+                // Discount Badge in Warm Amber
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            Brush.linearGradient(
-                                listOf(BrandSecondaryDark, BrandSecondary)
-                            )
-                        )
+                        .background(BrandAmber)
                         .padding(horizontal = 10.dp, vertical = 6.dp),
                     contentAlignment = Alignment.Center
                 ) {
@@ -467,7 +483,7 @@ fun OfferCard(
                         text = "${offer.discountPercent}% OFF",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.ExtraBold,
-                        color = Color.White
+                        color = Color(0xFF17324D)
                     )
                 }
             }
@@ -485,7 +501,7 @@ fun OfferCard(
                         text = "₹${offer.discountedPrice.toInt()}",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.ExtraBold,
-                        color = BrandPrimary
+                        color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
@@ -509,12 +525,11 @@ fun OfferCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f))
                     .border(
-                        1.dp,
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.2f),
-                        RoundedCornerShape(10.dp)
+                        BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)),
+                        RoundedCornerShape(12.dp)
                     )
                     .clickable {
                         clipboardManager.setText(AnnotatedString(offer.couponCode))
@@ -537,14 +552,14 @@ fun OfferCard(
                     Icon(
                         imageVector = Icons.Default.ConfirmationNumber,
                         contentDescription = "Coupon",
-                        tint = BrandSecondaryDark,
+                        tint = BrandAmber,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = "CODE: ${offer.couponCode}",
                         style = MaterialTheme.typography.labelMedium,
                         fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        color = MaterialTheme.colorScheme.onSurface,
                         letterSpacing = 1.sp
                     )
                 }
@@ -556,14 +571,14 @@ fun OfferCard(
                     Icon(
                         imageVector = Icons.Default.ContentCopy,
                         contentDescription = "Copy Code",
-                        tint = BrandPrimary,
+                        tint = MaterialTheme.colorScheme.secondary,
                         modifier = Modifier.size(14.dp)
                     )
                     Text(
                         text = "COPY",
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.Bold,
-                        color = BrandPrimary
+                        color = MaterialTheme.colorScheme.secondary
                     )
                 }
             }

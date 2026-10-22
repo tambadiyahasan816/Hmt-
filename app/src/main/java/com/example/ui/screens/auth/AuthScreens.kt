@@ -58,8 +58,8 @@ fun RoleSelectionScreen(
                 Brush.verticalGradient(
                     colors = listOf(
                         BrandPrimary,
-                        Color(0xFF172554),
-                        Color(0xFF0F172A)
+                        Color(0xFF102538),
+                        DarkBackground
                     )
                 )
             )
@@ -196,7 +196,7 @@ fun RoleSelectionScreen(
                 ),
                 border = CardDefaults.outlinedCardBorder().copy(
                     brush = Brush.linearGradient(
-                        listOf(Color(0xFFF97316), Color(0xFFEA580C))
+                        listOf(BrandTeal, BrandAccentDark)
                     ),
                     width = 1.5.dp
                 )
@@ -211,7 +211,7 @@ fun RoleSelectionScreen(
                         modifier = Modifier
                             .size(50.dp)
                             .clip(CircleShape)
-                            .background(Color(0xFFF97316)),
+                            .background(BrandTeal),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -243,7 +243,7 @@ fun RoleSelectionScreen(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                         contentDescription = null,
-                        tint = Color(0xFFF97316),
+                        tint = BrandTeal,
                         modifier = Modifier.size(22.dp)
                     )
                 }
@@ -262,7 +262,7 @@ fun RoleSelectionScreen(
                 ),
                 border = CardDefaults.outlinedCardBorder().copy(
                     brush = Brush.linearGradient(
-                        listOf(BrandPrimaryLight, Color(0xFF60A5FA))
+                        listOf(BrandPrimaryLight, Color(0xFF6BB2D6))
                     ),
                     width = 1.5.dp
                 )

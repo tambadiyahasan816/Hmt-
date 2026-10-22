@@ -150,7 +150,7 @@ fun ProfileDashboardScreen(
                             contentDescription = null,
                             tint = when {
                                 isOwner -> BrandSecondary
-                                isWorker -> Color(0xFFF97316)
+                                isWorker -> BrandTeal
                                 else -> Color.White
                             },
                             modifier = Modifier.size(30.dp)
@@ -193,7 +193,7 @@ fun ProfileDashboardScreen(
                                 .background(
                                     when (userRole) {
                                         UserRole.OWNER -> BrandSecondary
-                                        UserRole.WORKER -> Color(0xFFF97316)
+                                        UserRole.WORKER -> BrandTeal
                                         UserRole.ADMIN -> DangerRed
                                         UserRole.CUSTOMER -> BrandPrimaryLight
                                     }

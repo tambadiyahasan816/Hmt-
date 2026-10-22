@@ -119,25 +119,25 @@ fun HMTApp(viewModel: MainViewModel) {
         }
         if (isOffline) {
             Surface(
-                color = Color(0xFFF59E0B),
+                color = BrandAmber,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.CloudOff, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(Icons.Default.CloudOff, contentDescription = null, tint = Color(0xFF102A43), modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Offline Mode: Showing saved data", color = Color.White, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    Text("Offline Mode: Showing saved data", color = Color(0xFF102A43), fontSize = 12.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f))
                     TextButton(onClick = { viewModel.retryConnection() }) {
-                        Text("Retry", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                        Text("Retry", color = Color(0xFF102A43), fontWeight = FontWeight.Bold, fontSize = 12.sp)
                     }
                 }
             }
         }
         errorMessage?.let { error ->
             Surface(
-                color = Color(0xFFEF4444),
+                color = DangerRed,
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
@@ -495,19 +495,19 @@ fun HMTApp(viewModel: MainViewModel) {
 private fun getNavColors(isDark: Boolean): NavigationBarItemColors {
     return if (isDark) {
         NavigationBarItemDefaults.colors(
-            selectedIconColor = BrandSecondary,
-            selectedTextColor = BrandSecondary,
-            unselectedIconColor = Color.Gray,
-            unselectedTextColor = Color.Gray,
+            selectedIconColor = BrandAmber,
+            selectedTextColor = BrandAmber,
+            unselectedIconColor = Color.LightGray,
+            unselectedTextColor = Color.LightGray,
             indicatorColor = Color.White.copy(alpha = 0.12f)
         )
     } else {
         NavigationBarItemDefaults.colors(
-            selectedIconColor = BrandPrimary,
-            selectedTextColor = BrandPrimary,
-            unselectedIconColor = MaterialTheme.colorScheme.outline,
-            unselectedTextColor = MaterialTheme.colorScheme.outline,
-            indicatorColor = BrandPrimaryContainer
+            selectedIconColor = BrandTeal,
+            selectedTextColor = BrandTeal,
+            unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            indicatorColor = BrandTeal.copy(alpha = 0.14f)
         )
     }
 }
