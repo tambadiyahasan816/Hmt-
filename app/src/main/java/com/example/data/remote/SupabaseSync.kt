@@ -144,6 +144,45 @@ class SupabaseSync private constructor() {
         put("created_at", iso(message.timestamp))
     })
 
+    fun upsertPromotion(promo: com.example.data.model.Promotion) = post("promotions", JSONObject().apply {
+        put("id", promo.id)
+        put("brand_name", promo.brandName)
+        put("title", promo.title)
+        put("description", promo.description)
+        put("image_url", promo.imageUrl)
+        put("target_url", promo.targetUrl)
+        put("placement", promo.placement.name)
+        put("start_at", iso(promo.startAt))
+        put("end_at", iso(promo.endAt))
+        put("is_active", promo.isActive)
+        put("is_approved", promo.isApproved)
+        put("priority", promo.priority)
+        put("views", promo.views)
+        put("clicks", promo.clicks)
+        put("created_by", promo.createdBy)
+        put("created_at", iso(promo.createdAt))
+    })
+
+    fun deletePromotion(promoId: String) = deleteById("promotions", promoId)
+
+    fun recordPromotionView(promoId: String, currentViews: Int) {
+        if (!isConfigured) return
+        scope.launch {
+            request("PATCH", "promotions?id=eq.$promoId", JSONObject().apply {
+                put("views", currentViews + 1)
+            }.toString())
+        }
+    }
+
+    fun recordPromotionClick(promoId: String, currentClicks: Int) {
+        if (!isConfigured) return
+        scope.launch {
+            request("PATCH", "promotions?id=eq.$promoId", JSONObject().apply {
+                put("clicks", currentClicks + 1)
+            }.toString())
+        }
+    }
+
     fun deleteById(table: String, id: String) = delete(table, "id=eq.$id")
 
     private fun post(table: String, body: JSONObject) {

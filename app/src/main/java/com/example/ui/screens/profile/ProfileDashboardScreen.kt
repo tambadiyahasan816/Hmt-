@@ -70,7 +70,11 @@ fun ProfileDashboardScreen(
     val userRole = currentUser?.role ?: UserRole.CUSTOMER
     val isOwner = userRole == UserRole.OWNER
     val isWorker = userRole == UserRole.WORKER
-    val isAdmin = userRole == UserRole.ADMIN
+    val isAdmin = if (BuildConfig.HMT_ADMIN_FIREBASE_UID.isNotBlank()) {
+        currentUser != null && (currentUser.firebaseUid.trim() == BuildConfig.HMT_ADMIN_FIREBASE_UID.trim() || currentUser.id.trim() == BuildConfig.HMT_ADMIN_FIREBASE_UID.trim())
+    } else {
+        userRole == UserRole.ADMIN
+    }
 
     // Find the owner's business securely
     val ownerBusiness = if (isOwner) {

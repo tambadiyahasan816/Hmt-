@@ -265,3 +265,34 @@ data class ReelUploadRequest(
     val sizeBytes: Long = 0L,
     val mimeType: String = "video/mp4"
 )
+
+enum class PromotionPlacement {
+    LOGIN,
+    HOME,
+    REELS,
+    OFFERS
+}
+
+data class Promotion(
+    val id: String,
+    val brandName: String,
+    val title: String,
+    val description: String,
+    val imageUrl: String = "",
+    val targetUrl: String = "",
+    val placement: PromotionPlacement,
+    val startAt: Long = System.currentTimeMillis(),
+    val endAt: Long = System.currentTimeMillis() + TimeUnit.DAYS.toMillis(7),
+    val isActive: Boolean = true,
+    val isApproved: Boolean = true,
+    val priority: Int = 1,
+    val views: Int = 0,
+    val clicks: Int = 0,
+    val createdBy: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+) {
+    fun isCurrentlyRunning(currentTime: Long = System.currentTimeMillis()): Boolean {
+        return isActive && isApproved && currentTime in startAt..endAt
+    }
+}
+

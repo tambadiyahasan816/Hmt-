@@ -51,6 +51,9 @@ fun ReelsScreen(
     onOpenBusiness: (String) -> Unit,
     onOpenChat: (String) -> Unit,
     onUploadReel: (title: String, caption: String) -> Unit,
+    reelsPromotion: com.example.data.model.Promotion? = null,
+    onPromotionView: ((String) -> Unit)? = null,
+    onPromotionClick: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -73,6 +76,37 @@ fun ReelsScreen(
             .fillMaxSize()
             .background(Color.Black)
     ) {
+        if (reelsPromotion != null) {
+            var promoDismissed by remember(reelsPromotion.id) { mutableStateOf(false) }
+            if (!promoDismissed) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 56.dp, start = 14.dp, end = 14.dp)
+                ) {
+                    com.example.ui.components.PromotionBannerCard(
+                        promotion = reelsPromotion,
+                        onView = { onPromotionView?.invoke(it) },
+                        onClick = { onPromotionClick?.invoke(it) }
+                    )
+                    IconButton(
+                        onClick = { promoDismissed = true },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp)
+                            .size(28.dp)
+                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Dismiss",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
+        }
         if (activeReels.isEmpty()) {
             Box(
                 modifier = Modifier.fillMaxSize(),

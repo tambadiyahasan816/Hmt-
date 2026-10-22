@@ -149,4 +149,69 @@ class LocalPreferences(context: Context) {
     fun clearAll() {
         prefs.edit().clear().apply()
     }
+
+    fun savePromotions(promotions: List<com.example.data.model.Promotion>) {
+        val array = org.json.JSONArray()
+        for (p in promotions) {
+            val obj = org.json.JSONObject().apply {
+                put("id", p.id)
+                put("brand_name", p.brandName)
+                put("title", p.title)
+                put("description", p.description)
+                put("image_url", p.imageUrl)
+                put("target_url", p.targetUrl)
+                put("placement", p.placement.name)
+                put("start_at", p.startAt)
+                put("end_at", p.endAt)
+                put("is_active", p.isActive)
+                put("is_approved", p.isApproved)
+                put("priority", p.priority)
+                put("views", p.views)
+                put("clicks", p.clicks)
+                put("created_by", p.createdBy)
+                put("created_at", p.createdAt)
+            }
+            array.put(obj)
+        }
+        prefs.edit().putString("custom_promotions_json", array.toString()).apply()
+    }
+
+    fun loadPromotions(): List<com.example.data.model.Promotion> {
+        val raw = prefs.getString("custom_promotions_json", null) ?: return emptyList()
+        if (raw.isBlank()) return emptyList()
+        val list = mutableListOf<com.example.data.model.Promotion>()
+        try {
+            val array = org.json.JSONArray(raw)
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                val placement = try {
+                    com.example.data.model.PromotionPlacement.valueOf(obj.optString("placement", com.example.data.model.PromotionPlacement.HOME.name))
+                } catch (_: Exception) {
+                    com.example.data.model.PromotionPlacement.HOME
+                }
+                list.add(
+                    com.example.data.model.Promotion(
+                        id = obj.getString("id"),
+                        brandName = obj.optString("brand_name", ""),
+                        title = obj.optString("title", ""),
+                        description = obj.optString("description", ""),
+                        imageUrl = obj.optString("image_url", ""),
+                        targetUrl = obj.optString("target_url", ""),
+                        placement = placement,
+                        startAt = obj.optLong("start_at", System.currentTimeMillis()),
+                        endAt = obj.optLong("end_at", System.currentTimeMillis() + 604800000L),
+                        isActive = obj.optBoolean("is_active", true),
+                        isApproved = obj.optBoolean("is_approved", true),
+                        priority = obj.optInt("priority", 1),
+                        views = obj.optInt("views", 0),
+                        clicks = obj.optInt("clicks", 0),
+                        createdBy = obj.optString("created_by", ""),
+                        createdAt = obj.optLong("created_at", System.currentTimeMillis())
+                    )
+                )
+            }
+        } catch (_: Exception) {}
+        return list
+    }
 }
+

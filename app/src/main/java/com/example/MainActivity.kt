@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.example.data.model.PromotionPlacement
 import com.example.data.model.UserRole
 import com.example.data.repository.HimmatnagarRepository
 import com.example.ui.screens.admin.AdminPanelScreen
@@ -93,6 +94,7 @@ fun HMTApp(viewModel: MainViewModel) {
     val isOffline by viewModel.isOffline.collectAsStateWithLifecycle()
     val errorMessage by viewModel.errorMessage.collectAsStateWithLifecycle()
     val isLoading by viewModel.isLoading.collectAsStateWithLifecycle()
+    val promotions by viewModel.promotions.collectAsStateWithLifecycle()
 
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
@@ -174,7 +176,10 @@ fun HMTApp(viewModel: MainViewModel) {
                             android.widget.Toast.LENGTH_LONG
                         ).show()
                     }
-                }
+                },
+                loginPromotion = viewModel.getActivePromotion(PromotionPlacement.LOGIN),
+                onPromotionView = { viewModel.recordPromotionView(it) },
+                onPromotionClick = { viewModel.recordPromotionClick(it) }
             )
         }
 
@@ -273,7 +278,10 @@ fun HMTApp(viewModel: MainViewModel) {
                 onBack = { viewModel.handleBack() },
                 onSelectOffer = { offer ->
                     viewModel.openBusinessProfileById(offer.businessId)
-                }
+                },
+                offersPromotion = viewModel.getActivePromotion(PromotionPlacement.OFFERS),
+                onPromotionView = { viewModel.recordPromotionView(it) },
+                onPromotionClick = { viewModel.recordPromotionClick(it) }
             )
         }
 
@@ -323,17 +331,26 @@ fun HMTApp(viewModel: MainViewModel) {
         }
 
         ScreenState.ADMIN_PANEL -> {
-            AdminPanelScreen(
-                businesses = businesses,
-                reels = reels,
-                offers = offers,
-                onApproveBusiness = { bId, approve -> viewModel.approveBusiness(bId, approve) },
-                onDeleteBusiness = { bId -> viewModel.deleteBusiness(bId) },
-                onDeleteReel = { rId -> viewModel.deleteReel(rId) },
-                onDeleteOffer = { oId -> viewModel.deleteOffer(oId) },
-                onPurgeExpiredReels = { viewModel.purgeExpiredReels() },
-                onBack = { viewModel.handleBack() }
-            )
+            if (!viewModel.isCurrentUserAdmin()) {
+                viewModel.handleBack()
+            } else {
+                AdminPanelScreen(
+                    businesses = businesses,
+                    reels = reels,
+                    offers = offers,
+                    promotions = promotions,
+                    onApproveBusiness = { bId, approve -> viewModel.approveBusiness(bId, approve) },
+                    onDeleteBusiness = { bId -> viewModel.deleteBusiness(bId) },
+                    onDeleteReel = { rId -> viewModel.deleteReel(rId) },
+                    onDeleteOffer = { oId -> viewModel.deleteOffer(oId) },
+                    onPurgeExpiredReels = { viewModel.purgeExpiredReels() },
+                    onCreateOrUpdatePromotion = { viewModel.createOrUpdatePromotion(it) },
+                    onDeletePromotion = { viewModel.deletePromotion(it) },
+                    onTogglePromotionActive = { id, act -> viewModel.togglePromotionActive(id, act) },
+                    onTogglePromotionApproved = { id, app -> viewModel.togglePromotionApproved(id, app) },
+                    onBack = { viewModel.handleBack() }
+                )
+            }
         }
 
         ScreenState.REEL_DETAIL -> {
@@ -433,7 +450,10 @@ fun HMTApp(viewModel: MainViewModel) {
                             onFollowClick = { viewModel.toggleFollow(it) },
                             onSelectBusiness = { viewModel.openBusinessProfile(it) },
                             onSelectOffer = { viewModel.openOffersScreen() },
-                            onNavigateToOffers = { viewModel.openOffersScreen() }
+                            onNavigateToOffers = { viewModel.openOffersScreen() },
+                            homePromotion = viewModel.getActivePromotion(PromotionPlacement.HOME),
+                            onPromotionView = { viewModel.recordPromotionView(it) },
+                            onPromotionClick = { viewModel.recordPromotionClick(it) }
                         )
 
                         1 -> ReelsScreen(
@@ -444,7 +464,10 @@ fun HMTApp(viewModel: MainViewModel) {
                             onToggleLike = { viewModel.toggleLikeReel(it) },
                             onOpenBusiness = { viewModel.openBusinessProfileById(it) },
                             onOpenChat = { viewModel.openChatByBusinessId(it) },
-                            onUploadReel = { title, caption -> viewModel.uploadReel(title, caption) }
+                            onUploadReel = { title, caption -> viewModel.uploadReel(title, caption) },
+                            reelsPromotion = viewModel.getActivePromotion(PromotionPlacement.REELS),
+                            onPromotionView = { viewModel.recordPromotionView(it) },
+                            onPromotionClick = { viewModel.recordPromotionClick(it) }
                         )
 
                         2 -> WorkerDirectoryScreen(

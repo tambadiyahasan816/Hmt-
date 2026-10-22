@@ -46,6 +46,9 @@ class HimmatnagarRepository(
     private val _registeredUsers = MutableStateFlow<List<UserProfile>>(emptyList())
     val registeredUsers: StateFlow<List<UserProfile>> = _registeredUsers.asStateFlow()
 
+    private val _promotions = MutableStateFlow<List<Promotion>>(emptyList())
+    val promotions: StateFlow<List<Promotion>> = _promotions.asStateFlow()
+
     // Monthly Reel Quota Tracker Ledger (Asia/Kolkata timezone, max 3 per month)
     private val _reelUploadUsage = mutableMapOf<String, Int>()
 
@@ -81,6 +84,10 @@ class HimmatnagarRepository(
         val liked = localPrefs?.loadLikedReels() ?: emptySet()
         if (liked.isNotEmpty()) {
             _likedReelIds.value = liked
+        }
+        val loadedPromotions = localPrefs?.loadPromotions() ?: emptyList()
+        if (loadedPromotions.isNotEmpty()) {
+            _promotions.value = loadedPromotions
         }
     }
 
@@ -480,6 +487,81 @@ class HimmatnagarRepository(
             )
         )
         _workers.value = sampleWorkers
+
+        if (_promotions.value.isEmpty()) {
+            val samplePromotions = listOf(
+                Promotion(
+                    id = "promo_login_welcome",
+                    brandName = "City of Himmatnagar",
+                    title = "Discover Verified Shops & Skilled Workers",
+                    description = "Himmatnagar's official local community app. Connect directly with over 150 local artisans, retailers, and service providers.",
+                    imageUrl = "",
+                    targetUrl = "",
+                    placement = PromotionPlacement.LOGIN,
+                    startAt = now - TimeUnit.DAYS.toMillis(1),
+                    endAt = now + TimeUnit.DAYS.toMillis(30),
+                    isActive = true,
+                    isApproved = true,
+                    priority = 10,
+                    views = 120,
+                    clicks = 18,
+                    createdBy = "Admin"
+                ),
+                Promotion(
+                    id = "promo_home_festive",
+                    brandName = "Sabarkantha Traders Expo",
+                    title = "Himmatnagar Local Business Showcase",
+                    description = "Special showcase of verified local traders across Motipura, Station Road, and Tower Chowk. Explore exclusive deals today!",
+                    imageUrl = "",
+                    targetUrl = "https://himmatnagar.gujarat.gov.in",
+                    placement = PromotionPlacement.HOME,
+                    startAt = now - TimeUnit.DAYS.toMillis(1),
+                    endAt = now + TimeUnit.DAYS.toMillis(30),
+                    isActive = true,
+                    isApproved = true,
+                    priority = 5,
+                    views = 450,
+                    clicks = 62,
+                    createdBy = "Admin"
+                ),
+                Promotion(
+                    id = "promo_reels_showcase",
+                    brandName = "HMT Community Spotlight",
+                    title = "Local Artisans & Service Crafts",
+                    description = "Business owners and workers: showcase your work through 60-second local video highlights.",
+                    imageUrl = "",
+                    targetUrl = "",
+                    placement = PromotionPlacement.REELS,
+                    startAt = now - TimeUnit.DAYS.toMillis(1),
+                    endAt = now + TimeUnit.DAYS.toMillis(30),
+                    isActive = true,
+                    isApproved = true,
+                    priority = 5,
+                    views = 280,
+                    clicks = 34,
+                    createdBy = "Admin"
+                ),
+                Promotion(
+                    id = "promo_offers_bazaar",
+                    brandName = "Himmatnagar Bazaar Deals",
+                    title = "Verified Merchant Coupons & Discounts",
+                    description = "Save on electronics, sweet delicacies, and bridal apparel with verified local merchant codes.",
+                    imageUrl = "",
+                    targetUrl = "",
+                    placement = PromotionPlacement.OFFERS,
+                    startAt = now - TimeUnit.DAYS.toMillis(1),
+                    endAt = now + TimeUnit.DAYS.toMillis(30),
+                    isActive = true,
+                    isApproved = true,
+                    priority = 5,
+                    views = 310,
+                    clicks = 49,
+                    createdBy = "Admin"
+                )
+            )
+            _promotions.value = samplePromotions
+            localPrefs?.savePromotions(samplePromotions)
+        }
     }
 
     // Auto-Delete Feature Implementation: purge expired reels where expires_at < now()
@@ -526,15 +608,38 @@ class HimmatnagarRepository(
         googleName: String = ""
     ): UserProfile? {
         val cleanUid = firebaseUid.trim()
-        val existing = findUserByFirebaseUid(cleanUid) ?: return null
-        val updated = existing.copy(
-            email = if (googleEmail.isNotBlank()) googleEmail.trim() else existing.email,
-            name = if (existing.name.isBlank() && googleName.isNotBlank()) googleName.trim() else existing.name,
-            googleDisplayName = if (googleName.isNotBlank()) googleName.trim() else existing.googleDisplayName,
-            updatedAt = System.currentTimeMillis()
-        )
-        _registeredUsers.value = _registeredUsers.value.map {
-            if (it.firebaseUid == cleanUid || it.id == cleanUid) updated else it
+        val existing = findUserByFirebaseUid(cleanUid)
+        val adminUid = com.example.BuildConfig.HMT_ADMIN_FIREBASE_UID.trim()
+        val isAdminUid = adminUid.isNotBlank() && (cleanUid == adminUid || existing?.id == adminUid)
+
+        val updated = if (existing == null && isAdminUid) {
+            UserProfile(
+                id = cleanUid,
+                firebaseUid = cleanUid,
+                phone = "+91 99999 00000",
+                role = UserRole.ADMIN,
+                name = if (googleName.isNotBlank()) googleName.trim() else "HMT Admin",
+                email = googleEmail.trim(),
+                googleDisplayName = googleName.trim()
+            )
+        } else if (existing != null) {
+            existing.copy(
+                email = if (googleEmail.isNotBlank()) googleEmail.trim() else existing.email,
+                name = if (existing.name.isBlank() && googleName.isNotBlank()) googleName.trim() else existing.name,
+                googleDisplayName = if (googleName.isNotBlank()) googleName.trim() else existing.googleDisplayName,
+                role = if (isAdminUid) UserRole.ADMIN else existing.role,
+                updatedAt = System.currentTimeMillis()
+            )
+        } else {
+            return null
+        }
+
+        _registeredUsers.value = if (_registeredUsers.value.any { it.firebaseUid == cleanUid || it.id == cleanUid }) {
+            _registeredUsers.value.map {
+                if (it.firebaseUid == cleanUid || it.id == cleanUid) updated else it
+            }
+        } else {
+            _registeredUsers.value + updated
         }
         _currentUser.value = updated
         localPrefs?.saveCurrentUser(updated)
@@ -1364,5 +1469,99 @@ class HimmatnagarRepository(
         localPrefs?.saveFollowedBusinesses(updatedFollows)
         _businessViews.value = _businessViews.value - businessId
         _chatMessages.value = _chatMessages.value.filter { it.businessId != businessId }
+    }
+
+    // ========================================================================
+    // Custom Admin Promotion System
+    // ========================================================================
+
+    fun isUserAdmin(user: UserProfile?): Boolean {
+        if (user == null) return false
+        val adminUid = com.example.BuildConfig.HMT_ADMIN_FIREBASE_UID.trim()
+        if (adminUid.isNotBlank()) {
+            return user.firebaseUid.trim() == adminUid || user.id.trim() == adminUid
+        }
+        return user.role == UserRole.ADMIN
+    }
+
+    fun createOrUpdatePromotion(promotion: Promotion, adminUser: UserProfile?): Result<Promotion> {
+        if (!isUserAdmin(adminUser)) {
+            return Result.failure(IllegalStateException("Unauthorized: Only verified admin can create or edit promotions"))
+        }
+        val current = _promotions.value.toMutableList()
+        val idx = current.indexOfFirst { it.id == promotion.id }
+        if (idx >= 0) {
+            current[idx] = promotion
+        } else {
+            current.add(0, promotion)
+        }
+        _promotions.value = current
+        localPrefs?.savePromotions(current)
+        com.example.data.remote.SupabaseSync.getInstance().upsertPromotion(promotion)
+        return Result.success(promotion)
+    }
+
+    fun deletePromotion(promotionId: String, adminUser: UserProfile?): Result<Unit> {
+        if (!isUserAdmin(adminUser)) {
+            return Result.failure(IllegalStateException("Unauthorized: Only verified admin can delete promotions"))
+        }
+        val current = _promotions.value.filter { it.id != promotionId }
+        _promotions.value = current
+        localPrefs?.savePromotions(current)
+        com.example.data.remote.SupabaseSync.getInstance().deletePromotion(promotionId)
+        return Result.success(Unit)
+    }
+
+    fun togglePromotionActive(promotionId: String, active: Boolean, adminUser: UserProfile?): Result<Unit> {
+        if (!isUserAdmin(adminUser)) {
+            return Result.failure(IllegalStateException("Unauthorized: Only verified admin can toggle promotion status"))
+        }
+        val promo = _promotions.value.find { it.id == promotionId }
+            ?: return Result.failure(IllegalArgumentException("Promotion not found"))
+        val updated = promo.copy(isActive = active)
+        return createOrUpdatePromotion(updated, adminUser).map { }
+    }
+
+    fun togglePromotionApproved(promotionId: String, approved: Boolean, adminUser: UserProfile?): Result<Unit> {
+        if (!isUserAdmin(adminUser)) {
+            return Result.failure(IllegalStateException("Unauthorized: Only verified admin can approve promotions"))
+        }
+        val promo = _promotions.value.find { it.id == promotionId }
+            ?: return Result.failure(IllegalArgumentException("Promotion not found"))
+        val updated = promo.copy(isApproved = approved)
+        return createOrUpdatePromotion(updated, adminUser).map { }
+    }
+
+    fun recordPromotionView(promotionId: String) {
+        val current = _promotions.value.toMutableList()
+        val idx = current.indexOfFirst { it.id == promotionId }
+        if (idx >= 0) {
+            val p = current[idx]
+            val updated = p.copy(views = p.views + 1)
+            current[idx] = updated
+            _promotions.value = current
+            localPrefs?.savePromotions(current)
+            com.example.data.remote.SupabaseSync.getInstance().recordPromotionView(promotionId, p.views)
+        }
+    }
+
+    fun recordPromotionClick(promotionId: String) {
+        val current = _promotions.value.toMutableList()
+        val idx = current.indexOfFirst { it.id == promotionId }
+        if (idx >= 0) {
+            val p = current[idx]
+            val updated = p.copy(clicks = p.clicks + 1)
+            current[idx] = updated
+            _promotions.value = current
+            localPrefs?.savePromotions(current)
+            com.example.data.remote.SupabaseSync.getInstance().recordPromotionClick(promotionId, p.clicks)
+        }
+    }
+
+    fun getActivePromotionsForPlacement(placement: PromotionPlacement): List<Promotion> {
+        val now = System.currentTimeMillis()
+        return _promotions.value.filter {
+            it.placement == placement && it.isCurrentlyRunning(now)
+        }.sortedByDescending { it.priority }
     }
 }

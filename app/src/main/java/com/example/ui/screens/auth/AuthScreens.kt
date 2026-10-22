@@ -45,12 +45,25 @@ fun RoleSelectionScreen(
     onSelectOwner: () -> Unit,
     onSelectWorker: () -> Unit,
     onContinueAsGuest: () -> Unit,
-    onGoogleSignInSuccess: ((firebaseUid: String, googleName: String, googleEmail: String, idToken: String) -> Unit)? = null
+    onGoogleSignInSuccess: ((firebaseUid: String, googleName: String, googleEmail: String, idToken: String) -> Unit)? = null,
+    loginPromotion: com.example.data.model.Promotion? = null,
+    onPromotionView: ((String) -> Unit)? = null,
+    onPromotionClick: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val authHelper = remember { GoogleAuthHelper(context) }
     var isGoogleSigningIn by remember { mutableStateOf(false) }
+    var showLoginPromo by remember(loginPromotion) { mutableStateOf(loginPromotion != null) }
+
+    if (showLoginPromo && loginPromotion != null) {
+        com.example.ui.components.LoginPromotionDialog(
+            promotion = loginPromotion,
+            onDismiss = { showLoginPromo = false },
+            onView = { onPromotionView?.invoke(it) },
+            onClick = { onPromotionClick?.invoke(it) }
+        )
+    }
     Box(
         modifier = Modifier
             .fillMaxSize()

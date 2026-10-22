@@ -37,7 +37,10 @@ import com.example.ui.theme.*
 fun OffersScreen(
     offers: List<Offer>,
     onBack: () -> Unit,
-    onSelectOffer: (Offer) -> Unit
+    onSelectOffer: (Offer) -> Unit,
+    offersPromotion: com.example.data.model.Promotion? = null,
+    onPromotionView: ((String) -> Unit)? = null,
+    onPromotionClick: ((String) -> Unit)? = null
 ) {
     val context = LocalContext.current
     var searchQuery by remember { mutableStateOf("") }
@@ -132,6 +135,18 @@ fun OffersScreen(
                             onClick = { selectedCategoryFilter = if (selectedCategoryFilter == cat) null else cat },
                             label = { Text(cat, fontSize = 12.sp) },
                             leadingIcon = { CategoryIcon(category = cat, size = 14) }
+                        )
+                    }
+                }
+            }
+
+            if (offersPromotion != null) {
+                item {
+                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)) {
+                        com.example.ui.components.PromotionBannerCard(
+                            promotion = offersPromotion,
+                            onView = { onPromotionView?.invoke(it) },
+                            onClick = { onPromotionClick?.invoke(it) }
                         )
                     }
                 }

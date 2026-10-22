@@ -78,8 +78,22 @@ class MainViewModel(
     val likedReelIds = repository.likedReelIds
     val chatMessages = repository.chatMessages
     val businessViews = repository.businessViews
+    val promotions = repository.promotions
+
+    fun isCurrentUserAdmin(): Boolean = repository.isUserAdmin(currentUser.value)
+
+    fun getActivePromotion(placement: PromotionPlacement): Promotion? {
+        return repository.getActivePromotionsForPlacement(placement).firstOrNull()
+    }
+
+    fun getActivePromotions(placement: PromotionPlacement): List<Promotion> {
+        return repository.getActivePromotionsForPlacement(placement)
+    }
 
     fun navigateTo(screen: ScreenState) {
+        if (screen == ScreenState.ADMIN_PANEL && !isCurrentUserAdmin()) {
+            return
+        }
         _currentScreen.value = screen
     }
 
@@ -439,5 +453,30 @@ class MainViewModel(
 
     fun purgeExpiredReels() {
         repository.purgeExpiredReels()
+    }
+
+    // Promotion actions (Admin only)
+    fun createOrUpdatePromotion(promotion: Promotion): Result<Promotion> {
+        return repository.createOrUpdatePromotion(promotion, currentUser.value)
+    }
+
+    fun deletePromotion(promotionId: String): Result<Unit> {
+        return repository.deletePromotion(promotionId, currentUser.value)
+    }
+
+    fun togglePromotionActive(promotionId: String, active: Boolean): Result<Unit> {
+        return repository.togglePromotionActive(promotionId, active, currentUser.value)
+    }
+
+    fun togglePromotionApproved(promotionId: String, approved: Boolean): Result<Unit> {
+        return repository.togglePromotionApproved(promotionId, approved, currentUser.value)
+    }
+
+    fun recordPromotionView(promotionId: String) {
+        repository.recordPromotionView(promotionId)
+    }
+
+    fun recordPromotionClick(promotionId: String) {
+        repository.recordPromotionClick(promotionId)
     }
 }

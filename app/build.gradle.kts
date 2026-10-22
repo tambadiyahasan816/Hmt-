@@ -15,6 +15,8 @@ android {
     .replace("\\", "\\\\").replace("\"", "\\\"")
   val supabasePublishableKey = (project.findProperty("SUPABASE_PUBLISHABLE_KEY")?.toString() ?: "")
     .replace("\\", "\\\\").replace("\"", "\\\"")
+  val adminFirebaseUid = (project.findProperty("HMT_ADMIN_FIREBASE_UID")?.toString() ?: "")
+    .replace("\\", "\\\\").replace("\"", "\\\"")
 
   defaultConfig {
     applicationId = "com.aistudio.sheherhimmatnagar.kznvxp"
@@ -25,6 +27,7 @@ android {
 
     buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
     buildConfigField("String", "SUPABASE_PUBLISHABLE_KEY", "\"$supabasePublishableKey\"")
+    buildConfigField("String", "HMT_ADMIN_FIREBASE_UID", "\"$adminFirebaseUid\"")
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
   }

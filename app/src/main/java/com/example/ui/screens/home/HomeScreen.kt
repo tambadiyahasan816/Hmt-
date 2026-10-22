@@ -39,6 +39,9 @@ fun HomeScreen(
     onSelectBusiness: (Business) -> Unit,
     onSelectOffer: (Offer) -> Unit,
     onNavigateToOffers: () -> Unit,
+    homePromotion: com.example.data.model.Promotion? = null,
+    onPromotionView: ((String) -> Unit)? = null,
+    onPromotionClick: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
@@ -161,6 +164,18 @@ fun HomeScreen(
                             unfocusedBorderColor = Color.Transparent
                         ),
                         modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+        }
+
+        if (homePromotion != null) {
+            item {
+                Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    com.example.ui.components.PromotionBannerCard(
+                        promotion = homePromotion,
+                        onView = { onPromotionView?.invoke(it) },
+                        onClick = { onPromotionClick?.invoke(it) }
                     )
                 }
             }
